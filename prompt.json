@@ -1,0 +1,52 @@
+{
+  "scenes": [
+    {
+      "scene": "What if the real test of humanity isn’t what we build, but how long we survive?",
+      "scene_image_prompt": "A cinematic, photorealistic wide shot of Earth seen from deep space, floating quietly in the void. The planet is half-lit with golden sunlight and surrounded by stars and cosmic dust. There's a slight lens flare from the sun, and a distant asteroid belt is barely visible in the background. The mood is mysterious and isolated. Subtle film grain and a soft blue color grade create a haunting, timeless atmosphere.",
+      "scene_video_prompt": "The camera slowly zooms in on Earth, spinning gently as ambient cosmic particles drift across the frame. The light from the sun creates subtle reflections and shadows over the curve of the atmosphere.",
+      "scene_sound_prompt": "A deep, ambient rumble of space mixed with distant, echoing pulses like sonar. Layer in faint wind-like whispers to create a feeling of ancient presence and distance."
+    },
+    {
+      "scene": "Across 500 million years, Earth has already erased life five times.",
+      "scene_image_prompt": "A cinematic, photorealistic montage-style image showing five different extinction events: volcanic eruptions, asteroid impacts, frozen tundras, dried ocean beds, and burning forests. Each quadrant of the image represents a different cataclysm, divided with smooth transitions and atmospheric haze. Rendered with rich detail and dramatic lighting, emphasizing devastation and time’s vastness.",
+      "scene_video_prompt": "Each extinction scene fades into the next — meteors crash, lava flows, glaciers advance, oceans drain, and forests burn — in a rhythmic sequence of slow-motion collapse.",
+      "scene_sound_prompt": "Low-frequency rumbles transition into crackling fire, then howling wind, followed by ice fracturing and water draining. Each sound bleeds into the next with a ghostly echo."
+    },
+    {
+      "scene": "Ordovician, Devonian, Permian, Triassic, and Cretaceous... all reset buttons.",
+      "scene_image_prompt": "A cinematic, photorealistic still of an ancient rock face carved with fossilized names: 'Ordovician', 'Devonian', 'Permian', 'Triassic', 'Cretaceous'. The stone is weathered, cracked, and covered in moss. A single shaft of light breaks through a stormy sky above, casting eerie illumination across the carvings. The setting is remote, surrounded by mist and barren landscape.",
+      "scene_video_prompt": "The camera slowly pans across the fossil-etched rock, each name becoming clearer as the light shifts and clouds pass overhead. Dust falls as a piece of the rock cracks subtly.",
+      "scene_sound_prompt": "Distant thunder rolls. A slow drip of water echoes in the background. Subtle wind brushes across stone and foliage, with faint creaking like something ancient waking."
+    },
+    {
+      "scene": "And now, some believe we’re entering the Sixth Mass Extinction — and no one is stopping it.",
+      "scene_image_prompt": "A cinematic, photorealistic scene of a modern city skyline in decay. Skyscrapers stand partially collapsed under smog-filled skies. Nature is reclaiming the urban sprawl — vines wrap buildings, animals walk down empty highways. The color palette is grey-green with hints of rust. The lighting is overcast, eerie, and still.",
+      "scene_video_prompt": "Time-lapse effect showing the city transitioning from bustling to abandoned. Cars vanish, windows break, plants grow over concrete, and birds nest on traffic lights.",
+      "scene_sound_prompt": "Begin with faint city noise, slowly replaced by silence. Then add subtle sounds of wind, rustling plants, distant crows, and dripping water in empty buildings."
+    },
+    {
+      "scene": "But what if these extinctions are part of a cosmic clock — a schedule older than civilization itself?",
+      "scene_image_prompt": "A cinematic, photorealistic rendering of an enormous celestial clock suspended in deep space. The gears are made of stars, moons, and dark matter. It slowly rotates, casting soft light on floating ruins of alien civilizations in the background. The clock’s surface features strange alien symbols and etchings that pulse faintly with energy.",
+      "scene_video_prompt": "The camera orbits the glowing cosmic clock, revealing different alien symbols lighting up sequentially. A faint hum grows louder as one gear locks into place.",
+      "scene_sound_prompt": "Deep, resonant ticking echoes through space. Add soft mechanical groans and distant celestial chimes like glass bells underwater. Subtle choir notes rise and fade in waves."
+    },
+    {
+      "scene": "To some, humanity isn’t judged by what it creates, but how many extinctions it can endure.",
+      "scene_image_prompt": "A cinematic, photorealistic side view of a lone human standing at the edge of a massive cliff overlooking a post-apocalyptic valley, where remnants of technology are buried in the soil. The human wears a weathered cloak, symbolizing resilience, and stares out into the distant horizon. The lighting is soft twilight, with faint auroras flickering overhead.",
+      "scene_video_prompt": "Slow-motion pan behind the human as they take one step forward toward the valley. Dust and wind move around them as if time is holding its breath.",
+      "scene_sound_prompt": "Soft wind blowing across the canyon, distant metallic creaks from sunken ruins, and a single haunting cello note that slowly fades out."
+    },
+    {
+      "scene": "Alien civilizations may see us as newborns, waiting to see if we survive long enough to be noticed.",
+      "scene_image_prompt": "A cinematic, photorealistic image of a distant alien planet’s observatory — sleek and advanced — watching Earth through an interstellar lens. Inside the observatory, shadowy figures with elongated features and translucent skin stand silently. The view of Earth is magnified and glowing, shown as a fragile blue dot.",
+      "scene_video_prompt": "The camera slowly zooms out from the magnified Earth, revealing the alien figures behind the lens. One slowly tilts its head, observing.",
+      "scene_sound_prompt": "Ambient sci-fi hum layered with soft digital chirps and pulses. Add faint heartbeat-like thuds as tension builds, then silence, as if watching from beyond time."
+    },
+    {
+      "scene": "Maybe the Sixth isn’t an ending… maybe it’s the price of admission.",
+      "scene_image_prompt": "A cinematic, photorealistic close-up of a human hand reaching through fire and rubble toward a glowing orb suspended in mid-air. The orb pulses gently with light, reflecting galaxies within. The background is scorched earth, but above, stars begin to pierce the smoke. The image captures contrast — destruction and transcendence.",
+      "scene_video_prompt": "The hand slowly rises through ash and flame, stretching toward the orb. The orb glows brighter as fingers near it, then everything fades to white.",
+      "scene_sound_prompt": "Rising crescendo of strings, mingled with crackling fire and a heartbeat rhythm. As the hand reaches the orb, the sound cuts to a pure, ringing tone — then silence."
+    }
+  ]
+}
