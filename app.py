@@ -728,7 +728,7 @@ def show_advanced_settings():
                 st.text_area(f"Sound Example {i+1}:", value=example, height=80, disabled=True)
 
 def show_storyboard_view():
-    """Main storyboard view with card-based flexible generation"""
+    """Clean storyboard view focused on scripts and images"""
     
     if st.session_state.storyboard_data is None:
         st.error("No storyboard data found. Please go back and create a storyboard first.")
@@ -736,72 +736,412 @@ def show_storyboard_view():
     
     scenes = st.session_state.storyboard_data["scenes"]
     
-    # Compact top controls
+    # Proper header with title and core features
+    st.markdown("# 🎬 AI VIDEO GENERATOR")
+    
     col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
     
     with col1:
-        st.markdown(f"**Prompt:** {st.session_state.initial_prompt[:80]}{'...' if len(st.session_state.initial_prompt) > 80 else ''}")
+        st.markdown(f"**Project:** {st.session_state.initial_prompt[:80]}{'...' if len(st.session_state.initial_prompt) > 80 else ''}")
     
     with col2:
-        st.empty()  # Spacer
-    
-    with col3:
         if st.button("🔙 Back", use_container_width=True):
             st.session_state.current_step = 0
             st.rerun()
     
-    with col4:
+    with col3:
         if st.button("💾 Save", type="primary", use_container_width=True):
             save_project()
     
+    with col4:
+        if st.button("⚙️ Settings", use_container_width=True):
+            st.session_state.show_advanced_settings = True
+    
     st.markdown("---")
     
-    # Global generation controls
-    show_global_generation_controls(scenes)
-    
-    st.markdown("---")
-    
-    # Responsive storyboard grid
+    # Clean storyboard grid
     show_storyboard_grid(scenes)
 
-def show_global_generation_controls(scenes):
-    """Show global generation controls for all scenes"""
+def show_storyboard_grid(scenes):
+    """Display clean storyboard grid that spreads vertically like traditional storyboards"""
     
-    # Calculate generation statistics
-    total_scenes = len(scenes)
-    images_generated = sum(1 for i in range(total_scenes) if get_scene_state(i) and get_scene_state(i)["image_generated"])
-    videos_generated = sum(1 for i in range(total_scenes) if get_scene_state(i) and get_scene_state(i)["video_generated"])
-    sounds_generated = sum(1 for i in range(total_scenes) if get_scene_state(i) and get_scene_state(i)["sound_generated"])
+    num_scenes = len(scenes)
     
-    # Compact header with statistics and controls
-    col1, col2, col3, col4, col5, col6 = st.columns([1, 1, 1, 1, 1, 1])
+    # Traditional storyboard layout - 2-3 columns max, spreading vertically
+    if num_scenes <= 2:
+        cols_per_row = 2
+    elif num_scenes <= 6:
+        cols_per_row = 3
+    else:
+        cols_per_row = 3  # Keep max 3 columns for readability
+    
+    # CSS for proper storyboard layout with larger visual content
+    st.markdown("""
+    <style>
+    .storyboard-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    .scene-card {
+        border: 2px solid #e1e5e9;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        background: white;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        min-height: 500px;
+    }
+    .scene-header {
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 15px;
+        color: #1f2937;
+        text-align: center;
+        border-bottom: 2px solid #f3f4f6;
+        padding-bottom: 10px;
+    }
+    .scene-content-container {
+        width: 100%;
+        height: 280px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f8f9fa;
+        border: 2px dashed #d1d5db;
+        overflow: hidden;
+        position: relative;
+    }
+    .scene-content {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: cover;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+    .content-tabs {
+        display: flex;
+        gap: 5px;
+        margin-bottom: 10px;
+        justify-content: center;
+    }
+    .content-tab {
+        padding: 5px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        background: white;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.2s;
+    }
+    .content-tab:hover {
+        background: #f3f4f6;
+    }
+    .content-tab.active {
+        background: #3b82f6;
+        color: white;
+        border-color: #3b82f6;
+    }
+    .content-tab.disabled {
+        background: #f9fafb;
+        color: #9ca3af;
+        cursor: not-allowed;
+    }
+    .scene-script {
+        font-size: 14px;
+        line-height: 1.5;
+        color: #374151;
+        margin-bottom: 15px;
+        padding: 12px;
+        background: #f8f9fa;
+        border-radius: 6px;
+        border-left: 4px solid #3b82f6;
+        min-height: 80px;
+    }
+    .generation-controls {
+        display: flex;
+        gap: 8px;
+        justify-content: space-between;
+        margin-top: 10px;
+    }
+    .popup-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+    .popup-content {
+        max-width: 90vw;
+        max-height: 90vh;
+        border-radius: 8px;
+        position: relative;
+    }
+    .popup-close {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        cursor: pointer;
+        font-size: 20px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Create vertical storyboard layout
+    st.markdown('<div class="storyboard-container">', unsafe_allow_html=True)
+    
+    # Create rows of scenes
+    rows = (num_scenes + cols_per_row - 1) // cols_per_row
+    scene_index = 0
+    
+    for row in range(rows):
+        if scene_index >= num_scenes:
+            break
+        
+        cols = st.columns(cols_per_row)
+        
+        for col_idx in range(cols_per_row):
+            if scene_index >= num_scenes:
+                break
+                
+            with cols[col_idx]:
+                show_scene_card(scenes[scene_index], scene_index)
+                scene_index += 1
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def show_scene_card(scene, index):
+    """Display a single scene card with proper image scaling and all generation options"""
+    
+    scene_state = get_scene_state(index)
+    scene_data = get_scene_data(index)
+    
+    if not scene_state or not scene_data:
+        return
+    
+    # Scene header
+    st.markdown(f'<div class="scene-header">Scene {index + 1}</div>', unsafe_allow_html=True)
+    
+    # Content switching tabs
+    tab_col1, tab_col2, tab_col3 = st.columns(3)
+    
+    # Initialize active content type
+    if f"active_content_{index}" not in st.session_state:
+        if scene_state["sound_generated"]:
+            st.session_state[f"active_content_{index}"] = "sound"
+        elif scene_state["video_generated"]:
+            st.session_state[f"active_content_{index}"] = "video"
+        elif scene_state["image_generated"]:
+            st.session_state[f"active_content_{index}"] = "image"
+        else:
+            st.session_state[f"active_content_{index}"] = "image"
+    
+    with tab_col1:
+        if st.button("🎨 Image", key=f"tab_img_{index}", 
+                    use_container_width=True, 
+                    type="primary" if st.session_state[f"active_content_{index}"] == "image" else "secondary"):
+            st.session_state[f"active_content_{index}"] = "image"
+    
+    with tab_col2:
+        disabled = not scene_state["video_generated"]
+        if st.button("🎥 Video", key=f"tab_vid_{index}", 
+                    use_container_width=True, 
+                    disabled=disabled,
+                    type="primary" if st.session_state[f"active_content_{index}"] == "video" else "secondary"):
+            st.session_state[f"active_content_{index}"] = "video"
+    
+    with tab_col3:
+        disabled = not scene_state["sound_generated"]
+        if st.button("🔊 Sound", key=f"tab_sound_{index}", 
+                    use_container_width=True, 
+                    disabled=disabled,
+                    type="primary" if st.session_state[f"active_content_{index}"] == "sound" else "secondary"):
+            st.session_state[f"active_content_{index}"] = "sound"
+    
+    # Large content display area
+    content_container = st.container()
+    with content_container:
+        active_content = st.session_state[f"active_content_{index}"]
+        
+        if active_content == "sound" and scene_state["sound_generated"] and scene_data["generated_sound"]:
+            try:
+                st.video(scene_data["generated_sound"])
+            except:
+                st.markdown('<div style="text-align: center; color: #9ca3af; padding: 100px 0;">🔊 Sound Generated (Error Loading)</div>', unsafe_allow_html=True)
+        
+        elif active_content == "video" and scene_state["video_generated"] and scene_data["generated_video"]:
+            try:
+                st.video(scene_data["generated_video"])
+            except:
+                st.markdown('<div style="text-align: center; color: #9ca3af; padding: 100px 0;">🎥 Video Generated (Error Loading)</div>', unsafe_allow_html=True)
+        
+        elif active_content == "image" and scene_state["image_generated"] and scene_data["generated_image"]:
+            # Clickable image for popup
+            if st.button("🖼️", key=f"img_popup_{index}", help="Click to view full size"):
+                st.session_state[f"show_image_popup_{index}"] = True
+            
+            try:
+                st.image(scene_data["generated_image"], use_container_width=True)
+            except:
+                st.markdown('<div style="text-align: center; color: #9ca3af; padding: 100px 0;">🎨 Image Generated (Error Loading)</div>', unsafe_allow_html=True)
+        
+        else:
+            st.markdown('<div style="text-align: center; color: #9ca3af; padding: 100px 0;">📝 Generate content to view</div>', unsafe_allow_html=True)
+    
+    # Image popup modal
+    if st.session_state.get(f"show_image_popup_{index}", False):
+        show_image_popup(scene_data, index)
+    
+    # Editable script
+    st.markdown("**Script:**")
+    new_script = st.text_area(
+        "Script",
+        scene_data["scene_text"],
+        height=100,
+        key=f"script_{index}",
+        label_visibility="collapsed",
+        help="Edit the scene script"
+    )
+    if new_script != scene_data["scene_text"]:
+        update_scene_data(index, "scene_text", new_script)
+    
+    # Generation controls with status indicators
+    col1, col2, col3 = st.columns(3)
+    
+    # Image generation
+    with col1:
+        if scene_state["image_generated"]:
+            if st.button("🎨 ✓", key=f"img_{index}", help="Regenerate Image", use_container_width=True):
+                reset_from_step(index, "image")
+                generate_individual_image(index)
+        else:
+            if st.button("🎨 Generate", key=f"img_{index}", help="Generate Image", use_container_width=True):
+                generate_individual_image(index)
+    
+    # Video generation
+    with col2:
+        video_disabled = not scene_state["image_generated"]
+        if scene_state["video_generated"]:
+            if st.button("🎥 ✓", key=f"vid_{index}", help="Regenerate Video", use_container_width=True):
+                reset_from_step(index, "video")
+                generate_individual_video(index)
+        else:
+            button_text = "🎥 Generate" if not video_disabled else "🎥 Need Image"
+            if st.button(button_text, key=f"vid_{index}", disabled=video_disabled, help="Generate Video", use_container_width=True):
+                generate_individual_video(index)
+    
+    # Sound generation
+    with col3:
+        sound_disabled = not scene_state["video_generated"]
+        if scene_state["sound_generated"]:
+            if st.button("🔊 ✓", key=f"sound_{index}", help="Regenerate Sound", use_container_width=True):
+                reset_from_step(index, "sound")
+                generate_individual_sound(index)
+        else:
+            button_text = "🔊 Generate" if not sound_disabled else "🔊 Need Video"
+            if st.button(button_text, key=f"sound_{index}", disabled=sound_disabled, help="Generate Sound", use_container_width=True):
+                generate_individual_sound(index)
+    
+    # Popup prompt editor
+    if st.button("✏️ Edit Prompts", key=f"edit_{index}", use_container_width=True):
+        st.session_state[f"show_prompts_{index}"] = True
+    
+    # Show popup modal if opened
+    if st.session_state.get(f"show_prompts_{index}", False):
+        show_prompt_popup(scene_data, index)
+
+@st.dialog("View Image")
+def show_image_popup(scene_data, index):
+    """Show image in popup for closer inspection"""
+    
+    st.markdown(f"### Scene {index + 1} - Full Size Image")
+    
+    if scene_data["generated_image"]:
+        st.image(scene_data["generated_image"], use_container_width=True)
+    else:
+        st.error("No image available")
+    
+    if st.button("✖️ Close", use_container_width=True):
+        st.session_state[f"show_image_popup_{index}"] = False
+        st.rerun()
+
+@st.dialog("Edit Prompts")
+def show_prompt_popup(scene_data, index):
+    """Show popup modal for editing prompts"""
+    
+    st.markdown(f"### Scene {index + 1} Prompts")
+    
+    # Image prompt
+    st.markdown("**Image Prompt:**")
+    new_image_prompt = st.text_area(
+        "Image",
+        scene_data["scene_image_prompt"],
+        height=80,
+        key=f"popup_img_prompt_{index}",
+        label_visibility="collapsed"
+    )
+    
+    # Video prompt
+    st.markdown("**Video Prompt:**")
+    new_video_prompt = st.text_area(
+        "Video",
+        scene_data["scene_video_prompt"],
+        height=80,
+        key=f"popup_vid_prompt_{index}",
+        label_visibility="collapsed"
+    )
+    
+    # Sound prompt
+    st.markdown("**Sound Prompt:**")
+    new_sound_prompt = st.text_area(
+        "Sound",
+        scene_data["scene_sound_prompt"],
+        height=80,
+        key=f"popup_sound_prompt_{index}",
+        label_visibility="collapsed"
+    )
+    
+    # Save and close buttons
+    col1, col2 = st.columns(2)
     
     with col1:
-        st.metric("Images", f"{images_generated}/{total_scenes}", label_visibility="visible")
+        if st.button("💾 Save Changes", type="primary", use_container_width=True):
+            # Update prompts if changed
+            if new_image_prompt != scene_data["scene_image_prompt"]:
+                update_scene_data(index, "scene_image_prompt", new_image_prompt)
+            if new_video_prompt != scene_data["scene_video_prompt"]:
+                update_scene_data(index, "scene_video_prompt", new_video_prompt)
+            if new_sound_prompt != scene_data["scene_sound_prompt"]:
+                update_scene_data(index, "scene_sound_prompt", new_sound_prompt)
+            
+            st.session_state[f"show_prompts_{index}"] = False
+            st.rerun()
     
     with col2:
-        st.metric("Videos", f"{videos_generated}/{total_scenes}", label_visibility="visible")
-    
-    with col3:
-        st.metric("Sounds", f"{sounds_generated}/{total_scenes}", label_visibility="visible")
-    
-    with col4:
-        if st.button("🎨 All Images", use_container_width=True):
-            generate_all_images_new(scenes)
-    
-    with col5:
-        # Only enable if all images are generated
-        videos_disabled = images_generated < total_scenes
-        videos_help = "Generate all images first" if videos_disabled else "Generate all videos"
-        if st.button("🎥 All Videos", use_container_width=True, disabled=videos_disabled, help=videos_help):
-            generate_all_videos_new(scenes)
-    
-    with col6:
-        # Only enable if all videos are generated
-        sounds_disabled = videos_generated < total_scenes
-        sounds_help = "Generate all videos first" if sounds_disabled else "Generate all sounds"
-        if st.button("🔊 All Sounds", use_container_width=True, disabled=sounds_disabled, help=sounds_help):
-            generate_all_sounds_new(scenes)
+        if st.button("✖️ Cancel", use_container_width=True):
+            st.session_state[f"show_prompts_{index}"] = False
+            st.rerun()
+
+def show_simple_global_controls(scenes):
+    """Legacy function - removed global controls"""
+    pass
+
+def show_global_generation_controls(scenes):
+    """Legacy function - removed global controls"""
+    pass
 
 def generate_all_images_new(scenes):
     """Generate images for all scenes that don't have them"""
@@ -889,202 +1229,6 @@ def generate_all_sounds_new(scenes):
     
     st.success("All sounds generated!")
     st.rerun()
-
-
-
-def show_storyboard_grid(scenes):
-    """Display clean storyboard grid"""
-    
-    num_scenes = len(scenes)
-    
-    # Optimal grid layout for storyboard panels
-    if num_scenes <= 3:
-        cols_per_row = 3
-        card_height = "420px"
-    elif num_scenes <= 6:
-        cols_per_row = 3  
-        card_height = "380px"
-    elif num_scenes <= 8:
-        cols_per_row = 4
-        card_height = "360px"
-    else:
-        cols_per_row = 4
-        card_height = "340px"
-    
-    # Create the grid
-    rows = (num_scenes + cols_per_row - 1) // cols_per_row
-    scene_index = 0
-    
-    for row in range(rows):
-        if scene_index >= num_scenes:
-            break
-        
-        cols = st.columns(cols_per_row)
-        
-        for col_idx in range(cols_per_row):
-            if scene_index >= num_scenes:
-                break
-                
-            with cols[col_idx]:
-                show_scene_card(scenes[scene_index], scene_index, card_height)
-                scene_index += 1
-
-def show_scene_card(scene, index, card_height="400px"):
-    """Display clean storyboard panel like traditional storyboards"""
-    
-    scene_state = get_scene_state(index)
-    scene_data = get_scene_data(index)
-    
-    if not scene_state or not scene_data:
-        return
-    
-    # Calculate actual height for content areas
-    height_px = int(card_height[:-2])
-    
-    # Main panel HTML
-    panel_html = f"""
-    <div class="storyboard-panel" style="height: {card_height};">
-        <div class="panel-header">Scene {index + 1}</div>
-        <div class="status-row">
-            <span class="status-indicator {'completed' if scene_state['image_generated'] else ''}">🎨</span>
-            <span class="status-indicator {'completed' if scene_state['video_generated'] else ''}">🎥</span>
-            <span class="status-indicator {'completed' if scene_state['sound_generated'] else ''}">🔊</span>
-        </div>
-    </div>
-    """
-    
-    st.markdown(panel_html, unsafe_allow_html=True)
-    
-    # Content preview area
-    with st.container():
-        preview_height = height_px - 200  # Leave room for other elements
-        
-        # Show the latest generated content or placeholder
-        if scene_state["sound_generated"] and scene_data["generated_sound"]:
-            st.markdown('<div class="content-preview">', unsafe_allow_html=True)
-            try:
-                st.video(scene_data["generated_sound"])
-            except:
-                st.markdown('<div class="placeholder-text">🔊 Sound Generated (Error Loading)</div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-        elif scene_state["video_generated"] and scene_data["generated_video"]:
-            st.markdown('<div class="content-preview">', unsafe_allow_html=True)
-            try:
-                st.video(scene_data["generated_video"])
-            except:
-                st.markdown('<div class="placeholder-text">🎥 Video Generated (Error Loading)</div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-        elif scene_state["image_generated"] and scene_data["generated_image"]:
-            st.markdown('<div class="content-preview">', unsafe_allow_html=True)
-            try:
-                st.image(scene_data["generated_image"], use_container_width=True)
-            except:
-                st.markdown('<div class="placeholder-text">🎨 Image Generated (Error Loading)</div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-        else:
-            st.markdown('<div class="content-preview"><div class="placeholder-text">📝 Ready for Generation</div></div>', unsafe_allow_html=True)
-    
-    # Script text
-    st.markdown(f'<div class="script-text"><strong>Script:</strong><br>{scene_data["scene_text"]}</div>', unsafe_allow_html=True)
-    
-    # Generation controls
-    st.markdown('<div class="generation-controls">', unsafe_allow_html=True)
-    
-    # Image generation
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        status_text = "✅ Image Ready" if scene_state["image_generated"] else "⏳ Generate Image"
-        st.markdown(f'<small style="color: #64748b;">{status_text}</small>', unsafe_allow_html=True)
-    with col2:
-        button_text = "🔄" if scene_state["image_generated"] else "🎨"
-        if st.button(button_text, key=f"gen_img_{index}", help="Generate/Regenerate Image"):
-            if scene_state["image_generated"]:
-                reset_from_step(index, "image")
-            generate_individual_image(index)
-    
-    # Video generation
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        if scene_state["video_generated"]:
-            status_text = "✅ Video Ready"
-        elif scene_state["image_generated"]:
-            status_text = "⏳ Generate Video"
-        else:
-            status_text = "⚠️ Need Image First"
-        st.markdown(f'<small style="color: #64748b;">{status_text}</small>', unsafe_allow_html=True)
-    with col2:
-        button_text = "🔄" if scene_state["video_generated"] else "🎥"
-        disabled = not scene_state["image_generated"]
-        if st.button(button_text, key=f"gen_vid_{index}", disabled=disabled, help="Generate/Regenerate Video"):
-            if scene_state["video_generated"]:
-                reset_from_step(index, "video")
-            generate_individual_video(index)
-    
-    # Sound generation
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        if scene_state["sound_generated"]:
-            status_text = "✅ Sound Ready"
-        elif scene_state["video_generated"]:
-            status_text = "⏳ Generate Sound"
-        else:
-            status_text = "⚠️ Need Video First"
-        st.markdown(f'<small style="color: #64748b;">{status_text}</small>', unsafe_allow_html=True)
-    with col2:
-        button_text = "🔄" if scene_state["sound_generated"] else "🔊"
-        disabled = not scene_state["video_generated"]
-        if st.button(button_text, key=f"gen_sound_{index}", disabled=disabled, help="Generate/Regenerate Sound"):
-            if scene_state["sound_generated"]:
-                reset_from_step(index, "sound")
-            generate_individual_sound(index)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Expandable prompts section
-    with st.expander("✏️ Edit Prompts", expanded=False):
-        show_editable_prompts(scene_data, index)
-
-def show_editable_prompts(scene_data, index):
-    """Show editable prompts in a compact format"""
-    
-    # Image prompt
-    st.markdown("**Image Prompt:**")
-    new_image_prompt = st.text_area(
-        "Image",
-        scene_data["scene_image_prompt"],
-        height=68,
-        key=f"edit_img_prompt_{index}",
-        label_visibility="collapsed"
-    )
-    if new_image_prompt != scene_data["scene_image_prompt"]:
-        update_scene_data(index, "scene_image_prompt", new_image_prompt)
-    
-    # Video prompt
-    st.markdown("**Video Prompt:**")
-    new_video_prompt = st.text_area(
-        "Video",
-        scene_data["scene_video_prompt"],
-        height=68,
-        key=f"edit_vid_prompt_{index}",
-        label_visibility="collapsed"
-    )
-    if new_video_prompt != scene_data["scene_video_prompt"]:
-        update_scene_data(index, "scene_video_prompt", new_video_prompt)
-    
-    # Sound prompt
-    st.markdown("**Sound Prompt:**")
-    new_sound_prompt = st.text_area(
-        "Sound",
-        scene_data["scene_sound_prompt"],
-        height=68,
-        key=f"edit_sound_prompt_{index}",
-        label_visibility="collapsed"
-    )
-    if new_sound_prompt != scene_data["scene_sound_prompt"]:
-        update_scene_data(index, "scene_sound_prompt", new_sound_prompt)
 
 
 
