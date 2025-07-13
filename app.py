@@ -736,9 +736,7 @@ def show_storyboard_view():
     
     scenes = st.session_state.storyboard_data["scenes"]
     
-    # Proper header with title and core features
-    st.markdown("# 🎬 AI VIDEO GENERATOR")
-    
+    # Clean header with core features (no duplicate title)
     col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
     
     with col1:
@@ -989,19 +987,22 @@ def show_scene_card(scene, index):
                 st.markdown('<div style="text-align: center; color: #9ca3af; padding: 100px 0;">🎥 Video Generated (Error Loading)</div>', unsafe_allow_html=True)
         
         elif active_content == "image" and scene_state["image_generated"] and scene_data["generated_image"]:
-            # Clickable image for popup
-            if st.button("🖼️", key=f"img_popup_{index}", help="Click to view full size"):
-                st.session_state[f"show_image_popup_{index}"] = True
-            
             try:
-                st.image(scene_data["generated_image"], use_container_width=True)
+                # Image with overlay button for popup (single button approach)
+                col_img, col_btn = st.columns([4, 1])
+                with col_img:
+                    st.image(scene_data["generated_image"], use_container_width=True)
+                with col_btn:
+                    if st.button("🔍 View Full", key=f"img_popup_{index}", help="View full size image"):
+                        st.session_state[f"show_image_popup_{index}"] = True
+                        st.rerun()
             except:
                 st.markdown('<div style="text-align: center; color: #9ca3af; padding: 100px 0;">🎨 Image Generated (Error Loading)</div>', unsafe_allow_html=True)
         
         else:
             st.markdown('<div style="text-align: center; color: #9ca3af; padding: 100px 0;">📝 Generate content to view</div>', unsafe_allow_html=True)
     
-    # Image popup modal
+    # Handle image popup separately to avoid interference
     if st.session_state.get(f"show_image_popup_{index}", False):
         show_image_popup(scene_data, index)
     
@@ -1069,14 +1070,21 @@ def show_image_popup(scene_data, index):
     
     st.markdown(f"### Scene {index + 1} - Full Size Image")
     
-    if scene_data["generated_image"]:
+    if scene_data.get("generated_image"):
         st.image(scene_data["generated_image"], use_container_width=True)
+        
+        # Simple close button
+        if st.button("✖️ Close", use_container_width=True, key=f"close_popup_{index}"):
+            # Clear the popup state without interfering with other states
+            if f"show_image_popup_{index}" in st.session_state:
+                del st.session_state[f"show_image_popup_{index}"]
+            st.rerun()
     else:
         st.error("No image available")
-    
-    if st.button("✖️ Close", use_container_width=True):
-        st.session_state[f"show_image_popup_{index}"] = False
-        st.rerun()
+        if st.button("✖️ Close", use_container_width=True, key=f"close_popup_error_{index}"):
+            if f"show_image_popup_{index}" in st.session_state:
+                del st.session_state[f"show_image_popup_{index}"]
+            st.rerun()
 
 @st.dialog("Edit Prompts")
 def show_prompt_popup(scene_data, index):
