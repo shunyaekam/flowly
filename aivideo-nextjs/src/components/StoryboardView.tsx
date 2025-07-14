@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useAppStore, defaultModels, defaultModes } from '@/lib/store';
+import { useAppStore, defaultModes } from '@/lib/store';
 import { Scene, GenerationStep } from '@/types';
-import { ArrowLeft, Settings, Play, Download, Folder, ChevronDown, Image, Video, Volume2 } from 'lucide-react';
+import { ArrowLeft, Settings } from 'lucide-react';
 
 interface SceneModalProps {
   scene: Scene;
@@ -20,65 +20,71 @@ function SceneModal({ scene, onClose, onUpdate }: SceneModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto">
-        <div className="p-6">
-          <h2 className="text-2xl font-bold mb-6">Edit Scene</h2>
+    <div className="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center p-8 z-50">
+      <div className="bg-white w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+        <div className="p-8">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-light text-gray-900">edit scene</h2>
+          </div>
           
-          <div className="space-y-4">
+          <div className="space-y-8">
             <div>
-              <label className="block text-sm font-medium mb-2">Scene Text</label>
               <input
                 type="text"
                 value={editedScene.scene_text}
                 onChange={(e) => setEditedScene({...editedScene, scene_text: e.target.value})}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-0 py-2 text-lg border-none outline-none bg-transparent text-gray-900 font-light"
+                placeholder="Scene text"
               />
+              <div className="h-px bg-gray-200"></div>
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-2">Image Prompt</label>
               <textarea
                 value={editedScene.scene_image_prompt}
                 onChange={(e) => setEditedScene({...editedScene, scene_image_prompt: e.target.value})}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-0 py-2 border-none outline-none bg-transparent text-gray-900 font-light resize-none"
                 rows={3}
+                placeholder="Image prompt"
               />
+              <div className="h-px bg-gray-200"></div>
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-2">Video Prompt</label>
               <textarea
                 value={editedScene.scene_video_prompt}
                 onChange={(e) => setEditedScene({...editedScene, scene_video_prompt: e.target.value})}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-0 py-2 border-none outline-none bg-transparent text-gray-900 font-light resize-none"
                 rows={3}
+                placeholder="Video prompt"
               />
+              <div className="h-px bg-gray-200"></div>
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-2">Sound Prompt</label>
               <textarea
                 value={editedScene.scene_sound_prompt}
                 onChange={(e) => setEditedScene({...editedScene, scene_sound_prompt: e.target.value})}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-0 py-2 border-none outline-none bg-transparent text-gray-900 font-light resize-none"
                 rows={3}
+                placeholder="Sound prompt"
               />
+              <div className="h-px bg-gray-200"></div>
             </div>
           </div>
           
-          <div className="flex justify-end space-x-3 mt-6">
+          <div className="flex justify-center space-x-8 mt-12">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              className="text-sm font-light text-gray-400 hover:text-gray-600 transition-colors"
             >
-              Cancel
+              cancel
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="text-sm font-light text-gray-900 hover:text-gray-600 transition-colors"
             >
-              Save Changes
+              save
             </button>
           </div>
         </div>
@@ -92,8 +98,6 @@ export default function StoryboardView() {
     storyboardData, 
     setCurrentView, 
     setShowSettings,
-    selectedModel, 
-    setSelectedModel,
     selectedMode, 
     setSelectedMode,
     updateScene,
@@ -115,19 +119,11 @@ export default function StoryboardView() {
     setShowGenerateDropdown(false);
   };
 
-  const getGenerationStepIcon = (step: GenerationStep) => {
-    switch (step) {
-      case 'images': return <Image className="w-4 h-4" />;
-      case 'videos': return <Video className="w-4 h-4" />;
-      case 'sounds': return <Volume2 className="w-4 h-4" />;
-    }
-  };
-
   const getGenerationStepLabel = (step: GenerationStep) => {
     switch (step) {
-      case 'images': return 'Generate All Images';
-      case 'videos': return 'Generate All Videos';
-      case 'sounds': return 'Generate All Sounds';
+      case 'images': return 'images';
+      case 'videos': return 'videos';
+      case 'sounds': return 'sounds';
     }
   };
 
@@ -139,8 +135,6 @@ export default function StoryboardView() {
   };
 
   const handleSelectFolder = () => {
-    // In a real app, you'd use a file picker library or electron API
-    // For now, we'll just show a simple input
     const newDir = prompt('Enter save directory path:', saveDirectory);
     if (newDir) {
       setSaveDirectory(newDir);
@@ -148,204 +142,151 @@ export default function StoryboardView() {
   };
 
   const handleSaveAll = () => {
-    // Implementation for saving all videos to selected directory
     alert(`Saving all videos to: ${saveDirectory}`);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header with Settings */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <div className="flex items-center justify-between px-8 py-6">
+        <div className="flex items-center space-x-8">
+          <button
+            onClick={() => setCurrentView('input')}
+            className="text-gray-300 hover:text-gray-500 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <h1 className="text-2xl font-light text-gray-900 tracking-wide">flowly</h1>
+        </div>
+        
+        <div className="flex items-center space-x-8">
+          {/* Mode Selection */}
+          <div className="flex space-x-6">
+            {defaultModes.map((mode) => (
               <button
-                onClick={() => setCurrentView('input')}
-                className="flex items-center space-x-2 text-gray-600 hover:text-gray-800"
+                key={mode.id}
+                onClick={() => setSelectedMode(mode)}
+                className={`text-sm font-light transition-colors ${
+                  selectedMode.id === mode.id 
+                    ? 'text-gray-900' 
+                    : 'text-gray-400 hover:text-gray-600'
+                }`}
               >
-                <ArrowLeft className="w-5 h-5" />
-                <span>Back to Input</span>
+                {mode.name}
               </button>
-              <h1 className="text-2xl font-bold text-gray-900">AI Video Generator</h1>
-            </div>
-            
-            <div className="flex items-center space-x-3">
-              {/* Model Selection */}
-              <select
-                value={selectedModel.id}
-                onChange={(e) => {
-                  const model = defaultModels.find(m => m.id === e.target.value);
-                  if (model) setSelectedModel(model);
-                }}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                {defaultModels.map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {model.name}
-                  </option>
-                ))}
-              </select>
-              
-              {/* Mode Selection */}
-              <select
-                value={selectedMode.id}
-                onChange={(e) => {
-                  const mode = defaultModes.find(m => m.id === e.target.value);
-                  if (mode) setSelectedMode(mode);
-                }}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                {defaultModes.map((mode) => (
-                  <option key={mode.id} value={mode.id}>
-                    {mode.name}
-                  </option>
-                ))}
-              </select>
-              
-              <button
-                onClick={() => setShowSettings(true)}
-                className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg"
-              >
-                <Settings className="w-5 h-5" />
-              </button>
-            </div>
+            ))}
           </div>
+          
+          <button
+            onClick={() => setShowSettings(true)}
+            className="text-gray-300 hover:text-gray-500 transition-colors"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
       {/* Action Bar */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              {/* Generate All Dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowGenerateDropdown(!showGenerateDropdown)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                >
-                  <Play className="w-4 h-4" />
-                  <span>Generate All</span>
-                  <ChevronDown className="w-4 h-4" />
-                </button>
-                
-                {showGenerateDropdown && (
-                  <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-lg shadow-lg border z-10">
-                    {(['images', 'videos', 'sounds'] as GenerationStep[]).map((step) => (
-                      <button
-                        key={step}
-                        onClick={() => handleGenerateAll(step)}
-                        disabled={!canGenerateStep(step) || generationStatus[step] === 'generating'}
-                        className={`w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center space-x-2 ${
-                          !canGenerateStep(step) || generationStatus[step] === 'generating'
-                            ? 'opacity-50 cursor-not-allowed'
-                            : ''
-                        }`}
-                      >
-                        {getGenerationStepIcon(step)}
-                        <span>
-                          {generationStatus[step] === 'generating' 
-                            ? `Generating ${step}...` 
-                            : getGenerationStepLabel(step)
-                          }
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              
-              {/* Generation Status */}
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
-                {Object.entries(generationStatus).map(([step, status]) => (
-                  <div key={step} className="flex items-center space-x-1">
-                    {getGenerationStepIcon(step as GenerationStep)}
-                    <span className={`capitalize ${
-                      status === 'generating' ? 'text-blue-600' : 
-                      status === 'complete' ? 'text-green-600' : 
-                      status === 'error' ? 'text-red-600' : ''
-                    }`}>
-                      {status}
-                    </span>
-                  </div>
+      <div className="flex items-center justify-between px-8 py-4 border-t border-gray-100">
+        <div className="flex items-center space-x-6">
+          {/* Generate All Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowGenerateDropdown(!showGenerateDropdown)}
+              className="text-sm font-light text-gray-900 hover:text-gray-600 transition-colors"
+            >
+              generate all
+            </button>
+            
+            {showGenerateDropdown && (
+              <div className="absolute top-full left-0 mt-2 w-32 bg-white border border-gray-100 z-10">
+                {(['images', 'videos', 'sounds'] as GenerationStep[]).map((step) => (
+                  <button
+                    key={step}
+                    onClick={() => handleGenerateAll(step)}
+                    disabled={!canGenerateStep(step) || generationStatus[step] === 'generating'}
+                    className={`w-full text-left px-4 py-2 text-sm font-light hover:bg-gray-50 transition-colors ${
+                      !canGenerateStep(step) || generationStatus[step] === 'generating'
+                        ? 'text-gray-300 cursor-not-allowed'
+                        : 'text-gray-900 hover:text-gray-600'
+                    }`}
+                  >
+                    {generationStatus[step] === 'generating' 
+                      ? `generating...` 
+                      : getGenerationStepLabel(step)
+                    }
+                  </button>
                 ))}
               </div>
-            </div>
-            
-            <div className="flex items-center space-x-3">
-              {/* Folder Selector */}
-              <button
-                onClick={handleSelectFolder}
-                className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg"
-              >
-                <Folder className="w-4 h-4" />
-                <span>Select Folder</span>
-              </button>
-              
-              {/* Save All Button */}
-              <button
-                onClick={handleSaveAll}
-                className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-              >
-                <Download className="w-4 h-4" />
-                <span>Save All</span>
-              </button>
-            </div>
+            )}
           </div>
+          
+          {/* Generation Status */}
+          <div className="flex items-center space-x-4 text-xs text-gray-400">
+            {Object.entries(generationStatus).map(([step, status]) => (
+              <div key={step} className="flex items-center space-x-1">
+                <span className={`capitalize ${
+                  status === 'generating' ? 'text-gray-600' : 
+                  status === 'complete' ? 'text-gray-900' : 
+                  status === 'error' ? 'text-red-500' : ''
+                }`}>
+                  {step}: {status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        <div className="flex items-center space-x-6">
+          <button
+            onClick={handleSelectFolder}
+            className="text-sm font-light text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            select folder
+          </button>
+          
+          <button
+            onClick={handleSaveAll}
+            className="text-sm font-light text-gray-900 hover:text-gray-600 transition-colors"
+          >
+            save all
+          </button>
         </div>
       </div>
 
       {/* Storyboard Grid */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="px-8 py-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {storyboardData.scenes.map((scene, index) => (
-            <div key={scene.id} className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow">
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg font-semibold text-gray-900">Scene {index + 1}</h3>
-                  <button
-                    onClick={() => setSelectedScene(scene)}
-                    className="text-blue-600 hover:text-blue-800 text-sm"
-                  >
-                    Edit
-                  </button>
+            <div key={scene.id} className="group cursor-pointer" onClick={() => setSelectedScene(scene)}>
+              <div className="mb-4">
+                <div className="aspect-[9/16] bg-gray-50 flex items-center justify-center relative overflow-hidden">
+                  {scene.image_url ? (
+                    <img 
+                      src={scene.image_url} 
+                      alt={`Scene ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : scene.is_generating_image ? (
+                    <div className="text-center">
+                      <div className="text-xs text-gray-400">generating...</div>
+                    </div>
+                  ) : (
+                    <div className="text-center text-gray-300">
+                      <div className="text-xs">scene {index + 1}</div>
+                    </div>
+                  )}
                 </div>
-                
-                <div className="space-y-3">
-                  <div className="min-h-[120px] bg-gray-100 rounded-lg flex items-center justify-center relative overflow-hidden">
-                    {scene.image_url ? (
-                      <img 
-                        src={scene.image_url} 
-                        alt={`Scene ${index + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : scene.is_generating_image ? (
-                      <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                        <p className="text-sm text-gray-600">Generating image...</p>
-                      </div>
-                    ) : (
-                      <div className="text-center text-gray-500">
-                        <Image className="w-8 h-8 mx-auto mb-2" />
-                        <p className="text-sm">No image yet</p>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="text-sm">
-                    <p className="font-medium text-gray-900 mb-1">{scene.scene_text}</p>
-                  </div>
-                  
-                  {/* Generation Status */}
-                  <div className="flex items-center space-x-2 text-xs text-gray-600">
-                    <div className={`w-2 h-2 rounded-full ${scene.image_generated ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                    <span>Image</span>
-                    <div className={`w-2 h-2 rounded-full ${scene.video_generated ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                    <span>Video</span>
-                    <div className={`w-2 h-2 rounded-full ${scene.sound_generated ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                    <span>Sound</span>
-                  </div>
-                </div>
+              </div>
+              
+              <div className="text-sm font-light text-gray-900 mb-2">
+                {scene.scene_text}
+              </div>
+              
+              <div className="flex items-center space-x-2 text-xs text-gray-400">
+                <div className={`w-1 h-1 rounded-full ${scene.image_generated ? 'bg-gray-900' : 'bg-gray-300'}`}></div>
+                <div className={`w-1 h-1 rounded-full ${scene.video_generated ? 'bg-gray-900' : 'bg-gray-300'}`}></div>
+                <div className={`w-1 h-1 rounded-full ${scene.sound_generated ? 'bg-gray-900' : 'bg-gray-300'}`}></div>
               </div>
             </div>
           ))}

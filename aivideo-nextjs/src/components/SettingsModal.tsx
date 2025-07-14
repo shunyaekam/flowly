@@ -1,14 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Save, Key, Folder, Settings } from 'lucide-react';
-import { useAppStore } from '@/lib/store';
+import { X } from 'lucide-react';
+import { useAppStore, storyboardModels, imageModels, videoModels, soundModels } from '@/lib/store';
 
 export default function SettingsModal() {
   const { settings, setSettings, showSettings, setShowSettings } = useAppStore();
   const [formData, setFormData] = useState({
     openai_api_key: settings.openai_api_key,
     replicate_api_token: settings.replicate_api_token,
+    selected_storyboard_model: settings.selected_storyboard_model,
+    selected_image_model: settings.selected_image_model,
+    selected_video_model: settings.selected_video_model,
+    selected_sound_model: settings.selected_sound_model,
     general_prompt: settings.general_prompt,
     save_directory: settings.save_directory,
   });
@@ -22,10 +26,13 @@ export default function SettingsModal() {
   };
 
   const handleCancel = () => {
-    // Reset form data to original settings
     setFormData({
       openai_api_key: settings.openai_api_key,
       replicate_api_token: settings.replicate_api_token,
+      selected_storyboard_model: settings.selected_storyboard_model,
+      selected_image_model: settings.selected_image_model,
+      selected_video_model: settings.selected_video_model,
+      selected_sound_model: settings.selected_sound_model,
       general_prompt: settings.general_prompt,
       save_directory: settings.save_directory,
     });
@@ -33,8 +40,6 @@ export default function SettingsModal() {
   };
 
   const handleSelectFolder = () => {
-    // In a real app, you'd use a file picker library or electron API
-    // For now, we'll just show a simple input
     const newDir = prompt('Enter save directory path:', formData.save_directory);
     if (newDir) {
       setFormData({ ...formData, save_directory: newDir });
@@ -44,127 +49,172 @@ export default function SettingsModal() {
   if (!showSettings) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
+    <div className="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center p-8 z-50">
+      <div className="bg-white w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        <div className="p-8">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-2">
-              <Settings className="w-6 h-6 text-blue-600" />
-              <h2 className="text-2xl font-bold text-gray-900">Settings</h2>
-            </div>
+          <div className="flex items-center justify-between mb-12">
+            <h2 className="text-2xl font-light text-gray-900">settings</h2>
             <button
               onClick={handleCancel}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="text-gray-300 hover:text-gray-500 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* API Keys Section */}
-          <div className="mb-8">
-            <div className="flex items-center space-x-2 mb-4">
-              <Key className="w-5 h-5 text-gray-700" />
-              <h3 className="text-lg font-semibold text-gray-900">API Keys</h3>
-            </div>
+          {/* API Keys */}
+          <div className="mb-12">
+            <h3 className="text-lg font-light text-gray-900 mb-6">api keys</h3>
             
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  OpenAI API Key
-                </label>
                 <input
                   type="password"
                   value={formData.openai_api_key}
                   onChange={(e) => setFormData({ ...formData, openai_api_key: e.target.value })}
-                  placeholder="sk-..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="openai api key"
+                  className="w-full px-0 py-2 text-sm border-none outline-none bg-transparent text-gray-900 font-light placeholder-gray-400"
                 />
-                <p className="text-sm text-gray-500 mt-1">
-                  Required for storyboard generation. Get your key at{' '}
-                  <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                    OpenAI Platform
-                  </a>
-                </p>
+                <div className="h-px bg-gray-200"></div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Replicate API Token
-                </label>
                 <input
                   type="password"
                   value={formData.replicate_api_token}
                   onChange={(e) => setFormData({ ...formData, replicate_api_token: e.target.value })}
-                  placeholder="r8_..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="replicate api token"
+                  className="w-full px-0 py-2 text-sm border-none outline-none bg-transparent text-gray-900 font-light placeholder-gray-400"
                 />
-                <p className="text-sm text-gray-500 mt-1">
-                  Required for image, video, and sound generation. Get your token at{' '}
-                  <a href="https://replicate.com/account/api-tokens" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                    Replicate
-                  </a>
-                </p>
+                <div className="h-px bg-gray-200"></div>
               </div>
             </div>
           </div>
 
-          {/* Save Directory Section */}
-          <div className="mb-8">
-            <div className="flex items-center space-x-2 mb-4">
-              <Folder className="w-5 h-5 text-gray-700" />
-              <h3 className="text-lg font-semibold text-gray-900">Save Directory</h3>
-            </div>
+          {/* Models */}
+          <div className="mb-12">
+            <h3 className="text-lg font-light text-gray-900 mb-6">models</h3>
             
-            <div className="flex items-center space-x-3">
+            <div className="grid grid-cols-2 gap-8">
+              {/* Storyboard Model */}
+              <div>
+                <div className="text-sm font-light text-gray-600 mb-2">storyboard</div>
+                <select
+                  value={formData.selected_storyboard_model}
+                  onChange={(e) => setFormData({ ...formData, selected_storyboard_model: e.target.value })}
+                  className="w-full px-0 py-2 text-sm border-none outline-none bg-transparent text-gray-900 font-light"
+                >
+                  {storyboardModels.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="h-px bg-gray-200"></div>
+              </div>
+
+              {/* Image Model */}
+              <div>
+                <div className="text-sm font-light text-gray-600 mb-2">image</div>
+                <select
+                  value={formData.selected_image_model}
+                  onChange={(e) => setFormData({ ...formData, selected_image_model: e.target.value })}
+                  className="w-full px-0 py-2 text-sm border-none outline-none bg-transparent text-gray-900 font-light"
+                >
+                  {imageModels.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="h-px bg-gray-200"></div>
+              </div>
+
+              {/* Video Model */}
+              <div>
+                <div className="text-sm font-light text-gray-600 mb-2">video</div>
+                <select
+                  value={formData.selected_video_model}
+                  onChange={(e) => setFormData({ ...formData, selected_video_model: e.target.value })}
+                  className="w-full px-0 py-2 text-sm border-none outline-none bg-transparent text-gray-900 font-light"
+                >
+                  {videoModels.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="h-px bg-gray-200"></div>
+              </div>
+
+              {/* Sound Model */}
+              <div>
+                <div className="text-sm font-light text-gray-600 mb-2">sound</div>
+                <select
+                  value={formData.selected_sound_model}
+                  onChange={(e) => setFormData({ ...formData, selected_sound_model: e.target.value })}
+                  className="w-full px-0 py-2 text-sm border-none outline-none bg-transparent text-gray-900 font-light"
+                >
+                  {soundModels.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="h-px bg-gray-200"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Save Directory */}
+          <div className="mb-12">
+            <h3 className="text-lg font-light text-gray-900 mb-6">save directory</h3>
+            
+            <div className="flex items-center space-x-4">
               <input
                 type="text"
                 value={formData.save_directory}
                 onChange={(e) => setFormData({ ...formData, save_directory: e.target.value })}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="flex-1 px-0 py-2 text-sm border-none outline-none bg-transparent text-gray-900 font-light"
                 placeholder="./final_videos"
               />
               <button
                 onClick={handleSelectFolder}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                className="text-sm font-light text-gray-400 hover:text-gray-600 transition-colors"
               >
-                Browse
+                browse
               </button>
             </div>
-            <p className="text-sm text-gray-500 mt-1">
-              Directory where generated videos will be saved
-            </p>
+            <div className="h-px bg-gray-200"></div>
           </div>
 
-          {/* General Prompt Section */}
-          <div className="mb-8">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">General Prompt</h3>
+          {/* General Prompt */}
+          <div className="mb-12">
+            <h3 className="text-lg font-light text-gray-900 mb-6">general prompt</h3>
             <textarea
               value={formData.general_prompt}
               onChange={(e) => setFormData({ ...formData, general_prompt: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              rows={4}
+              className="w-full px-0 py-2 text-sm border-none outline-none bg-transparent text-gray-900 font-light resize-none"
+              rows={3}
               placeholder="General instructions for content generation..."
             />
-            <p className="text-sm text-gray-500 mt-1">
-              General instructions that will be applied to all content generation
-            </p>
+            <div className="h-px bg-gray-200"></div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end space-x-3">
+          <div className="flex justify-center space-x-8">
             <button
               onClick={handleCancel}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+              className="text-sm font-light text-gray-400 hover:text-gray-600 transition-colors"
             >
-              Cancel
+              cancel
             </button>
             <button
               onClick={handleSave}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="text-sm font-light text-gray-900 hover:text-gray-600 transition-colors"
             >
-              <Save className="w-4 h-4" />
-              <span>Save Settings</span>
+              save
             </button>
           </div>
         </div>

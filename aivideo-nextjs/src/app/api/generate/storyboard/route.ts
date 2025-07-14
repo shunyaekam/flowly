@@ -3,7 +3,7 @@ import OpenAI from 'openai';
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt, mode, openai_api_key, general_prompt } = await request.json();
+    const { prompt, mode, model, params, openai_api_key, general_prompt } = await request.json();
 
     if (!openai_api_key) {
       return NextResponse.json({ error: 'OpenAI API key is required' }, { status: 400 });
@@ -51,13 +51,13 @@ IMPORTANT GUIDELINES:
 - Output ONLY valid JSON with no additional text or markdown formatting`;
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: `Create a storyboard for: ${prompt}` }
       ],
-      temperature: 0.7,
-      max_tokens: 4000,
+      temperature: params.temperature || 0.7,
+      max_tokens: params.max_tokens || 4000,
     });
 
     const storyboardText = response.choices[0].message.content;
@@ -117,7 +117,6 @@ IMPORTANT GUIDELINES:
       scenes: scenesWithIds,
       original_prompt: prompt,
       mode: mode.name,
-      model: 'gpt-4o',
       created_at: new Date().toISOString(),
     };
 
