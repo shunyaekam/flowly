@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@layer utilities {
+  .line-clamp-4 {
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* React Flow custom styles */
+.react-flow__handle {
+  border: 2px solid white;
+  background: #9ca3af;
+  border-radius: 50%;
+  width: 12px;
+  height: 12px;
+}
+
+.react-flow__handle:hover {
+  background: #4b5563;
+}
+
+.react-flow__handle.connecting {
+  background: #3b82f6;
+}
+
+.react-flow__handle.valid {
+  background: #10b981;
+}
+
+/* Hide default React Flow attribution */
+.react-flow__attribution {
+  display: none;
+}
