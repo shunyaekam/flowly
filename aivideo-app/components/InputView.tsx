@@ -122,7 +122,7 @@ export default function InputView() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center">
         {/* Logo */}
-        <h1 className="text-3xl mb-20">☯</h1>
+        <h1 className="text-3xl mb-20 font-serif" style={{ fontVariantEmoji: 'text' }}>&#9775;</h1>
 
         {/* Input */}
         <div className="w-[500px] mb-8">
