@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useAppStore, imageModels, videoModels, audioModels } from '@/lib/store';
 import { X, RefreshCw } from 'lucide-react';
+import { generateImage, generateVideo, generateAudio } from '@/lib/api';
+import { playSounds } from '@/lib/sounds';
 
 export default function SceneViewerOverlay() {
   const { 
@@ -49,6 +51,7 @@ export default function SceneViewerOverlay() {
         scene_sound_prompt: audioPrompt
       });
     }
+    playSounds.cancel(); // Cancel sound when closing overlay
     setEditingSceneId(null);
   };
   
@@ -80,19 +83,64 @@ export default function SceneViewerOverlay() {
     });
     
     try {
-      // TODO: Implement API calls for generation
-      console.log(`Generating ${type} for scene ${currentScene.id}`);
+      let result: string | null = null;
       
-      // Simulate generation delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // For now, just log the action
-      alert(`${type} generation will be implemented with API integration`);
-    } catch (error) {
-      console.error(`Failed to generate ${type}:`, error);
-    } finally {
-      setIsGenerating(false);
-    }
+      switch (type) {
+        case 'image':
+          if (!settings.replicate_api_key) {
+            throw new Error('Please add your Replicate API key in settings');
+          }
+          result = await generateImage(imagePrompt, settings.replicate_api_key);
+          if (result) {
+            updateScene(currentScene.id, {
+              generated_image: result,
+              image_generated: true
+            });
+            playSounds.ok(); // Success sound
+          }
+          break;
+          
+        case 'video':
+          if (!settings.replicate_api_key) {
+            throw new Error('Please add your Replicate API key in settings');
+          }
+          if (!currentScene.generated_image) {
+            throw new Error('Please generate an image first');
+          }
+          result = await generateVideo(videoPrompt, currentScene.generated_image, settings.replicate_api_key);
+          if (result) {
+            updateScene(currentScene.id, {
+              generated_video: result,
+              video_generated: true
+            });
+            playSounds.ok(); // Success sound
+          }
+          break;
+          
+        case 'audio':
+          if (!settings.replicate_api_key) {
+            throw new Error('Please add your Replicate API key in settings');
+          }
+          if (!currentScene.generated_video) {
+            throw new Error('Please generate a video first');
+          }
+          result = await generateAudio(currentScene.generated_video, audioPrompt, settings.replicate_api_key);
+          if (result) {
+            updateScene(currentScene.id, {
+              generated_sound: result,
+              sound_generated: true
+            });
+            playSounds.ok(); // Success sound
+          }
+          break;
+      }
+            } catch (error) {
+          console.error(`Failed to generate ${type}:`, error);
+          playSounds.openOverlay(); // System NG for errors
+          alert(error instanceof Error ? error.message : `Failed to generate ${type}`);
+        } finally {
+          setIsGenerating(false);
+        }
   };
   
   // Render content based on selected tab
@@ -227,6 +275,7 @@ export default function SceneViewerOverlay() {
               
               <button
                 onClick={() => handleGenerate('image')}
+                onMouseEnter={() => !isGenerating && playSounds.hover()}
                 disabled={isGenerating}
                 className="w-full py-3 text-white hover:text-white/80 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-medium"
               >
@@ -281,6 +330,7 @@ export default function SceneViewerOverlay() {
               
               <button
                 onClick={() => handleGenerate('video')}
+                onMouseEnter={() => !isGenerating && playSounds.hover()}
                 disabled={isGenerating}
                 className="w-full py-3 text-white hover:text-white/80 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-medium"
               >
@@ -335,6 +385,7 @@ export default function SceneViewerOverlay() {
               
               <button
                 onClick={() => handleGenerate('audio')}
+                onMouseEnter={() => !isGenerating && playSounds.hover()}
                 disabled={isGenerating}
                 className="w-full py-3 text-white hover:text-white/80 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-medium"
               >
@@ -380,7 +431,11 @@ export default function SceneViewerOverlay() {
           {(['script', 'image', 'video', 'audio'] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => setSceneViewTab(tab)}
+              onClick={() => {
+                playSounds.option();
+                setSceneViewTab(tab);
+              }}
+              onMouseEnter={() => playSounds.hover()}
               className={`px-6 py-2 text-sm font-medium capitalize rounded-full transition-colors ${
                 sceneViewTab === tab 
                   ? 'text-white' 

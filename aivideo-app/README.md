@@ -1,24 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Video Generator
 
-## Getting Started
+An intelligent video creation tool that generates complete video storyboards with AI-generated images, videos, and audio.
 
-First, run the development server:
+## Features
+
+- **AI Storyboard Generation**: Create detailed video scripts using OpenAI
+- **Image Generation**: Generate cinematic images with Replicate's Seedream model
+- **Video Generation**: Create videos from images using Kling 2.1 Pro
+- **Audio Generation**: Add sound and music using Thinksound
+- **Project Management**: Save complete projects with all generated assets
+- **Interactive Storyboard**: Visual node-based storyboard editor
+- **Multiple Formats**: Support for conspiracy, educational, motivational, and storytelling formats
+
+## Setup
+
+### 1. Install Dependencies
+
+```bash
+npm install
+```
+
+### 2. API Keys Setup
+
+**⚠️ IMPORTANT**: You need API keys to use the generation features.
+
+**Recommended Method**: Add API keys through the app's Settings modal:
+- **OpenAI API Key**: For advanced storyboard generation (optional - demo mode available)
+- **Replicate API Token**: For image/video/audio generation (required)
+
+**Alternative**: You can also set OpenAI key via environment variables:
+
+```bash
+# Create .env.local file (optional)
+OPENAI_API_KEY=sk-your-openai-api-key-here
+```
+
+See `ENV_SETUP.md` for detailed setup instructions.
+
+### 3. Run the Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) with your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Usage
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Create Storyboard**: Enter your video concept and select a format
+2. **Generate Content**: Use individual scene generation or batch "Generate All"
+3. **Edit & Refine**: Modify prompts and regenerate specific content
+4. **Save Project**: Download a ZIP file with all generated assets
 
 ## Learn More
 
