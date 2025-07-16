@@ -48,9 +48,9 @@ function SceneNode({ data }: any) {
         style={{ left: -20, width: 'auto', height: 'auto', background: 'none' }}
         title="Connect to previous scene"
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" className="fill-black hover:fill-gray-700 transition-colors">
-          <path d="M2 2L14 8L2 14V2Z" />
-        </svg>
+        <div className="text-black hover:text-gray-700 transition-colors text-lg font-light">
+          &gt;
+        </div>
       </Handle>
       
       {/* Scene card */}
@@ -278,7 +278,6 @@ function StoryboardFlow() {
             className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back
           </button>
           
           {/* Generate All Section */}
@@ -287,7 +286,7 @@ function StoryboardFlow() {
               onClick={handleGenerateAll}
               className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
             >
-              Generate All
+              generate all
             </button>
             
             <DropdownMenu.Root>
@@ -303,19 +302,19 @@ function StoryboardFlow() {
                     className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded cursor-pointer"
                     onClick={() => handleGenerateSpecific('images')}
                   >
-                    Images
+                    images
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded cursor-pointer"
                     onClick={() => handleGenerateSpecific('videos')}
                   >
-                    Videos
+                    videos
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded cursor-pointer"
                     onClick={() => handleGenerateSpecific('sounds')}
                   >
-                    Sounds
+                    sounds
                   </DropdownMenu.Item>
                 </DropdownMenu.Content>
               </DropdownMenu.Portal>
@@ -328,14 +327,14 @@ function StoryboardFlow() {
               onClick={handleSave}
               className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
             >
-              Save
+              save
             </button>
             
             <button
               onClick={() => setShowSettingsModal(true)}
               className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
             >
-              Settings
+              settings
             </button>
           </div>
         </div>
@@ -350,7 +349,7 @@ function StoryboardFlow() {
       {/* Instructions */}
       <div className="px-8 py-2 bg-gray-50 border-b border-gray-100">
         <p className="text-xs text-gray-500 text-center">
-          Double-click any scene to edit its content • Drag to reposition • Right-click edges to disconnect
+          double-click any scene to edit its content • drag to reposition • right-click edges to disconnect
         </p>
       </div>
       

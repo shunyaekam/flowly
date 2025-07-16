@@ -38,21 +38,26 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   }, [isOpen, settings, selectedMode]);
   
   const handleSettingChange = (key: keyof Settings, value: string) => {
-    setLocalSettings({
+    const updatedSettings = {
       ...localSettings,
       [key]: value
-    });
+    };
+    setLocalSettings(updatedSettings);
+    // Auto-save immediately
+    setSettings(updatedSettings);
   };
   
   const handleSaveGeneralPrompt = () => {
-    handleSettingChange('general_prompt', localSettings.general_prompt);
+    setSettings(localSettings);
   };
   
   const handleResetGeneralPrompt = () => {
-    setLocalSettings({
+    const updatedSettings = {
       ...localSettings,
       general_prompt: GENERAL_PROMPT
-    });
+    };
+    setLocalSettings(updatedSettings);
+    setSettings(updatedSettings);
   };
   
   const handleSaveModePrompt = () => {
@@ -60,10 +65,12 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       ...localSettings.mode_prompts,
       [selectedMode]: currentModePrompt
     };
-    setLocalSettings({
+    const updatedSettings = {
       ...localSettings,
       mode_prompts: updatedModePrompts
-    });
+    };
+    setLocalSettings(updatedSettings);
+    setSettings(updatedSettings);
   };
   
   const handleResetModePrompt = () => {
@@ -71,21 +78,28 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setCurrentModePrompt(defaultPrompt);
   };
   
-  const handleSave = () => {
-    // Save mode prompt if it's been modified
+  const handleModeChange = (newMode: string) => {
+    // Save current mode prompt before switching
     if (currentModePrompt !== (settings.mode_prompts[selectedMode] || TOPIC_PROMPTS[selectedMode as keyof typeof TOPIC_PROMPTS]?.prompt || '')) {
       const updatedModePrompts = {
         ...localSettings.mode_prompts,
         [selectedMode]: currentModePrompt
       };
-      setSettings({
+      const updatedSettings = {
         ...localSettings,
         mode_prompts: updatedModePrompts
-      });
-    } else {
-      setSettings(localSettings);
+      };
+      setLocalSettings(updatedSettings);
+      setSettings(updatedSettings);
     }
-    onClose();
+    
+    setSelectedMode(newMode);
+    
+    // Load new mode prompt
+    const modePrompt = settings.mode_prompts[newMode] || 
+                      TOPIC_PROMPTS[newMode as keyof typeof TOPIC_PROMPTS]?.prompt || 
+                      '';
+    setCurrentModePrompt(modePrompt);
   };
   
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -96,6 +110,17 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       target.classList.contains('backdrop-clickable') ||
       (target.tagName === 'DIV' && !target.closest('select') && !target.closest('textarea') && !target.closest('input'))
     ) {
+      // Save any pending changes before closing
+      if (currentModePrompt !== (settings.mode_prompts[selectedMode] || TOPIC_PROMPTS[selectedMode as keyof typeof TOPIC_PROMPTS]?.prompt || '')) {
+        const updatedModePrompts = {
+          ...localSettings.mode_prompts,
+          [selectedMode]: currentModePrompt
+        };
+        setSettings({
+          ...localSettings,
+          mode_prompts: updatedModePrompts
+        });
+      }
       onClose();
     }
   };
@@ -109,12 +134,12 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     >
       {/* Settings content */}
       <div className="h-full flex backdrop-clickable" onClick={handleBackdropClick}>
-        {/* Left Panel - Configuration Controls */}
-        <div className="w-1/2 h-full p-8 overflow-y-auto backdrop-clickable" onClick={handleBackdropClick}>
+        {/* Left Panel - API Keys */}
+        <div className="w-1/3 h-full p-8 pr-4 overflow-y-auto backdrop-clickable" onClick={handleBackdropClick}>
           <h2 className="text-2xl font-light text-white mb-6">api keys</h2>
           
           {/* API Keys */}
-          <div className="space-y-4 mb-8">
+          <div className="space-y-4">
             <div>
               <label className="block text-sm font-light text-white/80 mb-2">
                 REPLICATE:
@@ -143,27 +168,13 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               />
             </div>
           </div>
-          
-          {/* Video Mode */}
-          <h2 className="text-2xl font-light text-white mb-6">video mode</h2>
-          <div className="mb-8">
-            <select
-              value={selectedMode}
-              onChange={(e) => setSelectedMode(e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full px-0 py-2 bg-transparent border-none text-white focus:outline-none appearance-none cursor-pointer text-sm"
-            >
-              {Object.entries(TOPIC_PROMPTS).map(([key, value]) => (
-                <option key={key} value={key} className="bg-gray-800">
-                  {value.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          
+        </div>
+        
+        {/* Middle Panel - Models & Video Mode */}
+        <div className="w-1/3 h-full p-8 px-4 overflow-y-auto backdrop-clickable" onClick={handleBackdropClick}>
           {/* Models */}
           <h2 className="text-2xl font-light text-white mb-6">models</h2>
-          <div className="space-y-4">
+          <div className="space-y-4 mb-8">
             <div>
               <label className="block text-sm font-light text-white/80 mb-2">
                 storyboard:
@@ -236,10 +247,27 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </select>
             </div>
           </div>
+          
+          {/* Video Mode */}
+          <h2 className="text-2xl font-light text-white mb-6">video mode</h2>
+          <div>
+            <select
+              value={selectedMode}
+              onChange={(e) => handleModeChange(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full px-0 py-2 bg-transparent border-none text-white focus:outline-none appearance-none cursor-pointer text-sm"
+            >
+              {Object.entries(TOPIC_PROMPTS).map(([key, value]) => (
+                <option key={key} value={key} className="bg-gray-800">
+                  {value.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         
         {/* Right Panel - Prompts */}
-        <div className="w-1/2 h-full p-8 overflow-y-auto">
+        <div className="w-1/3 h-full p-8 pl-4 overflow-y-auto">
           {/* General Prompt */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
@@ -315,14 +343,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             )}
           </div>
         </div>
-        
-        {/* Save button - bottom right */}
-        <button
-          onClick={handleSave}
-          className="absolute bottom-8 right-8 py-2 text-white hover:text-white/80 transition-colors text-sm font-medium"
-        >
-          save changes
-        </button>
       </div>
     </div>
   );
