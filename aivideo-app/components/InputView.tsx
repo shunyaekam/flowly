@@ -132,7 +132,7 @@ export default function InputView() {
               value={prompt}
               onChange={handlePromptChange}
               onKeyPress={handleKeyPress}
-              placeholder="describe your video"
+              placeholder="describe your story"
               className="w-full border-b border-black text-lg px-0 py-2 resize-none focus:outline-none overflow-hidden min-h-[40px] transition-all bg-transparent"
               rows={1}
               disabled={isGenerating}
