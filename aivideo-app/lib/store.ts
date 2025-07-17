@@ -103,25 +103,8 @@ export const audioModels = [
   { id: 'audioldm', name: 'AudioLDM' }
 ];
 
-// Default topic prompts
-export const TOPIC_PROMPTS = {
-  conspiracy: {
-    name: "Conspiracy Theory",
-    prompt: "Create a cinematic, intelligent, and scroll-stopping TikTok script based on this conspiracy theory {input}. Follow this format exactly: Start with a 1-sentence hook (max 2 seconds) using a question or intriguing fact (\"Why did...\", \"What if…\", \"Did you know that…\"). Then build a 7–9 scene script (~20–35 seconds total), written as immersive, voiceover-style narration — not camera directions. Each \"scene\" should be 1–2 sentences max and evoke a visual moment. The tone should feel like a Netflix doc: cinematic, calm, composed, and mysterious — never loud, never clickbait. The final line must leave the viewer wondering or imply the story isn't really over. Use real historical dates, locations, and terminology where possible to enhance realism."
-  },
-  educational: {
-    name: "Educational Content",
-    prompt: "Create an engaging educational TikTok script about {input}. Start with a compelling hook question or surprising fact (1-2 seconds). Build a 6-8 scene script (~25-40 seconds) that teaches the audience something valuable. Use clear, conversational language with smooth transitions between concepts. Each scene should be 1-2 sentences that paint a clear visual picture. Make it informative but entertaining, like a good teacher explaining a fascinating topic."
-  },
-  motivational: {
-    name: "Motivational/Inspirational",
-    prompt: "Create an inspiring and motivational TikTok script based on {input}. Start with a powerful hook that resonates emotionally (1-2 seconds). Build a 5-7 scene script (~20-30 seconds) that tells a compelling story of overcoming challenges or achieving success. Use uplifting language that motivates action. Each scene should be 1-2 sentences that create vivid, inspiring imagery. End with a call to action that empowers the viewer."
-  },
-  storytelling: {
-    name: "Storytelling/Narrative",
-    prompt: "Create a captivating story-based TikTok script about {input}. Start with an intriguing hook that sets up the story (1-2 seconds). Build a 7-10 scene script (~30-45 seconds) that tells a complete narrative with beginning, middle, and end. Use vivid, descriptive language that makes viewers feel like they're experiencing the story. Each scene should be 1-2 sentences that advance the plot. Create emotional connection and satisfying resolution."
-  }
-};
+// Import topic prompts from JSON file
+export { TOPIC_PROMPTS } from './prompt-loader';
 
 // General instructions
 export const GENERAL_PROMPT = `Make sure not to use em dashes (use commas instead) and other punctuation that would confuse the script reader (who is a robot). Next, with the scene informations, generate prompts for the images, the videos (that will be made with the images) and the sound for the scenes. The prompts should be as long and detailed as possible or should be, since it needs to look alluring. Output all scenes (including the hook) with their corresponding prompts in the format and only respond with the finalized format. The format and example prompts are listed below, pay close attention.`;

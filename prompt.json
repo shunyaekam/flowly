@@ -1,0 +1,58 @@
+{
+  "scenes": [
+    {
+      "scene": "Have you ever heard of a country that doesn’t exist?",
+      "scene_image_prompt": "A cinematic, photorealistic close-up of an old, weathered passport lying open on a customs officer’s desk. The passport has foreign characters and the country listed as 'Taured' in bold, official font. There’s a subtle spotlight on the document while the officer’s gloved hand hovers above it, hesitating. The room is dim, with cold blue overhead lighting and shadowy corners. Dust particles float in the air. Shallow depth of field blurs everything except the word 'Taured.'",
+      "scene_video_prompt": "A customs officer slowly flips open a mysterious passport as the word 'Taured' is revealed under harsh inspection light, his hand frozen mid-air in disbelief.",
+      "scene_sound_prompt": "Faint buzzing of fluorescent lights, a slow exhale from the officer, followed by the soft flick of a passport being opened."
+    },
+    {
+      "scene": "In 1954, a man arrived at Tokyo Haneda Airport claiming to be from Taured, a country between France and Germany.",
+      "scene_image_prompt": "A cinematic, photorealistic wide shot of Tokyo Haneda Airport in the 1950s, with retro signage, vintage suitcases, and travelers in period clothing. The man in question stands in the center wearing a grey suit and black tie, holding his briefcase confidently. He appears European, mid-40s, confused but calm. Japanese customs agents look on suspiciously. The atmosphere feels tense yet procedural.",
+      "scene_video_prompt": "The man walks through passport control surrounded by mid-century travelers, as customs agents exchange unsure glances.",
+      "scene_sound_prompt": "Footsteps echoing on tile, murmured Japanese voices, the rolling sound of luggage wheels, and a distant airport announcement in Japanese."
+    },
+    {
+      "scene": "He spoke multiple European languages, his documents were flawless, and he insisted Taured had existed for over a thousand years.",
+      "scene_image_prompt": "A photorealistic close-up of a man confidently explaining his origins in a customs interrogation room. A map of Europe is pinned to the wall behind him with a red circle where Taured should be. He gestures toward it, eyebrows furrowed. Papers with stamps and signatures are scattered across the table. The light source is a harsh desk lamp illuminating only his face and the papers.",
+      "scene_video_prompt": "The man calmly points to a map as he explains in French and Japanese, while officers exchange whispered doubts.",
+      "scene_sound_prompt": "Soft shuffling of papers, the clicking of a pen, and the man’s voice switching between French and Japanese with eerie fluency."
+    },
+    {
+      "scene": "Customs detained him and placed him in a guarded hotel room overnight while they investigated.",
+      "scene_image_prompt": "A cinematic nighttime shot of a 1950s Tokyo hotel exterior, rain falling gently in the background. The lit window of one room glows softly. A silhouette of the man stands behind the curtain. The hotel sign flickers faintly in the rain. The camera angle is from the street level, as if watching covertly.",
+      "scene_video_prompt": "Rain trickles down the hotel window as the man stands motionless, staring out at the city below.",
+      "scene_sound_prompt": "Rain tapping against the glass, faint hum of neon lights, and the low rumble of distant traffic."
+    },
+    {
+      "scene": "But by morning, he was gone.",
+      "scene_image_prompt": "A moody interior shot of the now-empty hotel room. The bed is neatly made, the suitcase untouched, but the window is slightly open. The curtain moves subtly with the wind. On the desk, his passport and documents have vanished. The atmosphere feels still and abandoned.",
+      "scene_video_prompt": "Camera pans across the empty room slowly, lingering on the gently swaying curtain and the open window.",
+      "scene_sound_prompt": "Soft creaking of the curtain rod, breeze rustling the fabric, and distant city ambience fading into silence."
+    },
+    {
+      "scene": "No security footage, no witnesses, and no trace he had ever been there.",
+      "scene_image_prompt": "A security office from the 1950s, filled with analog monitors, reels, and files. Two Japanese officers look baffled, one pointing at a static-filled monitor screen showing nothing. A half-lit cigarette smolders in an ashtray. A clipboard with notes about 'Taured man' lies on the desk, the final line underlined: 'Disappeared'.",
+      "scene_video_prompt": "A grainy black-and-white monitor loops empty hallway footage while the officer shakes his head.",
+      "scene_sound_prompt": "Clicking of old film reels, a sputtering cigarette, and low muttering in Japanese questioning the impossible."
+    },
+    {
+      "scene": "His passport, documents, and even the company he claimed to work for never existed.",
+      "scene_image_prompt": "A close-up of a Japanese bureaucrat flipping through an old international registry. The pages show no mention of Taured. He pauses, baffled. In the background, a wall clock ticks audibly. The man’s finger stops on a blank entry. The scene has a vintage sepia tone.",
+      "scene_video_prompt": "He flips pages faster, his eyes widening, then slams the book shut and stares at the camera.",
+      "scene_sound_prompt": "Rapid page flipping, clock ticking steadily, then a deep sigh of disbelief followed by silence."
+    },
+    {
+      "scene": "Some say it was an interdimensional slip, others call it a government cover-up.",
+      "scene_image_prompt": "A cinematic composite image blending a star map over a modern globe. In the foreground, ghostly outlines of parallel versions of Europe fade in and out of alignment. A mysterious figure watches from a distance, half in shadow, half illuminated by shifting cosmic light.",
+      "scene_video_prompt": "The map glitches and reshapes subtly, as if different realities are colliding in one frame.",
+      "scene_sound_prompt": "Low-frequency humming, static pulses, and brief warping tones that fade into cold stillness."
+    },
+    {
+      "scene": "But one thing remains — no one has seen or heard from the man from Taured ever again.",
+      "scene_image_prompt": "A cinematic, melancholic wide shot of a quiet European forest at dawn. Mist clings to the trees. A path leads to nowhere. In the center stands a faded signpost pointing to countries that exist — except one faint, weathered arrow points toward 'Taured'.",
+      "scene_video_prompt": "The camera slowly moves past the forest path and lingers on the faded 'Taured' sign as fog rolls in.",
+      "scene_sound_prompt": "Birds chirping faintly in the distance, wind brushing through trees, and a final, eerie silence."
+    }
+  ]
+}

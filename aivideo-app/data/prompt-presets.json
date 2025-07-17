@@ -1,0 +1,42 @@
+{
+  "conspiracy": {
+    "name": "Conspiracy Theory",
+    "description": "Mysterious and intriguing content with a documentary feel",
+    "prompt": "Create a cinematic, intelligent, and scroll-stopping TikTok script based on this conspiracy theory {input}. Follow this format exactly: Start with a 1-sentence hook (max 2 seconds) using a question or intriguing fact (\"Why did...\", \"What if…\", \"Did you know that…\"). Then build a 7–9 scene script (~20–35 seconds total), written as immersive, voiceover-style narration — not camera directions. Each \"scene\" should be 1–2 sentences max and evoke a visual moment. The tone should feel like a Netflix doc: cinematic, calm, composed, and mysterious — never loud, never clickbait. The final line must leave the viewer wondering or imply the story isn't really over. Use real historical dates, locations, and terminology where possible to enhance realism."
+  },
+  "educational": {
+    "name": "Educational Content",
+    "description": "Clear, informative content that teaches something valuable",
+    "prompt": "Create an engaging educational TikTok script about {input}. Start with a compelling hook question or surprising fact (1-2 seconds). Build a 6-8 scene script (~25-40 seconds) that teaches the audience something valuable. Use clear, conversational language with smooth transitions between concepts. Each scene should be 1-2 sentences that paint a clear visual picture. Make it informative but entertaining, like a good teacher explaining a fascinating topic."
+  },
+  "motivational": {
+    "name": "Motivational/Inspirational",
+    "description": "Inspiring and uplifting content that motivates action",
+    "prompt": "Create an inspiring and motivational TikTok script based on {input}. Start with a powerful hook that resonates emotionally (1-2 seconds). Build a 5-7 scene script (~20-30 seconds) that tells a compelling story of overcoming challenges or achieving success. Use uplifting language that motivates action. Each scene should be 1-2 sentences that create vivid, inspiring imagery. End with a call to action that empowers the viewer."
+  },
+  "storytelling": {
+    "name": "Storytelling/Narrative",
+    "description": "Narrative-driven content with beginning, middle, and end",
+    "prompt": "Create a captivating story-based TikTok script about {input}. Start with an intriguing hook that sets up the story (1-2 seconds). Build a 7-10 scene script (~30-45 seconds) that tells a complete narrative with beginning, middle, and end. Use vivid, descriptive language that makes viewers feel like they're experiencing the story. Each scene should be 1-2 sentences that advance the plot. Create emotional connection and satisfying resolution."
+  },
+  "comedy": {
+    "name": "Comedy/Humor",
+    "description": "Funny and entertaining content with comedic timing",
+    "prompt": "Create a humorous and entertaining TikTok script about {input}. Start with a funny hook or relatable situation (1-2 seconds). Build a 5-7 scene script (~20-30 seconds) that delivers laughs through clever observations, unexpected twists, or relatable humor. Each scene should be 1-2 sentences that build toward a punchline or funny revelation. Keep it light-hearted and entertaining while staying relevant to the topic."
+  },
+  "review": {
+    "name": "Product/Service Review",
+    "description": "Honest reviews and recommendations with clear pros/cons",
+    "prompt": "Create an honest and helpful review script about {input}. Start with a clear statement about what you're reviewing (1-2 seconds). Build a 6-8 scene script (~30-40 seconds) that covers key features, pros and cons, and real-world usage. Each scene should be 1-2 sentences that provide specific, actionable insights. End with a clear recommendation and who this would be best for."
+  },
+  "tutorial": {
+    "name": "How-To/Tutorial",
+    "description": "Step-by-step instructional content with clear guidance",
+    "prompt": "Create a clear and actionable tutorial script for {input}. Start with the end result or benefit (1-2 seconds). Build a 7-10 scene script (~35-45 seconds) that breaks down the process into simple, followable steps. Each scene should be 1-2 sentences that explain one specific action or tip. Use encouraging language and anticipate common mistakes or questions."
+  },
+  "lifestyle": {
+    "name": "Lifestyle/Daily Life",
+    "description": "Relatable content about daily experiences and lifestyle choices",
+    "prompt": "Create a relatable lifestyle script about {input}. Start with a relatable situation or feeling (1-2 seconds). Build a 6-8 scene script (~25-35 seconds) that explores daily life, personal experiences, or lifestyle choices. Each scene should be 1-2 sentences that feel authentic and conversational. Include practical tips or insights that viewers can apply to their own lives."
+  }
+} 
