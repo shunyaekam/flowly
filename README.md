@@ -262,3 +262,4 @@ We welcome all contributions, from bug fixes to new features!
 ---
 
 *Made with ❤️ for creators who want to bring their stories to life with AI*
+--
