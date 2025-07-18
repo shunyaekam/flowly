@@ -1,4 +1,4 @@
-import { Scene, StoryboardData } from './store';
+import { Scene, StoryboardData, storyboardModels } from './store';
 import { TOPIC_PROMPTS, GENERAL_PROMPT } from './store';
 
 // Model examples for prompts
@@ -30,10 +30,18 @@ export async function generateStoryboard(
   formatType: string,
   customModes: Record<string, string>,
   apiKey: string,
-  generalPrompt: string
+  generalPrompt: string,
+  selectedModel?: string
 ): Promise<StoryboardData> {
   if (!apiKey) {
     throw new Error('OpenAI API key is required');
+  }
+
+  // Get model parameters from the selected model, not sure why we need this section
+  const modelConfig = storyboardModels.find(m => m.id === selectedModel);
+  
+  if (!modelConfig) {
+    throw new Error(`Model '${selectedModel}' not found. Please select a valid model in settings.`);
   }
 
   // Get the topic prompt based on format type
@@ -81,6 +89,10 @@ ${MODEL_EXAMPLES.sound_examples.map((ex, i) => `${i + 1}. ${ex}`).join('\n')}
 
 IMPORTANT: Your response must be ONLY valid JSON with no additional text, explanations, or markdown formatting.`;
 
+  // Log the model and parameters being used
+  console.log('[OpenAI API] Using model:', modelConfig.model_id, 'with params:', modelConfig.params);
+  console.log('[OpenAI API] System prompt:', systemPrompt);
+
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -89,12 +101,12 @@ IMPORTANT: Your response must be ONLY valid JSON with no additional text, explan
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: modelConfig.model_id,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Input: ${userInput}` }
         ],
-        temperature: 0.7
+        ...modelConfig.params
       })
     });
 

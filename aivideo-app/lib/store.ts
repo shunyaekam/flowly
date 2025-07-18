@@ -71,18 +71,42 @@ export interface AppState {
 
 // Available models
 export const storyboardModels = [
-  {
-    id: 'gpt-4o',
-    name: 'OpenAI 4o',
-    model_id: 'gpt-4o',
-    params: { temperature: 0.7 }
-  },
-  {
-    id: 'gpt-4-turbo',
-    name: 'GPT-4 Turbo',
-    model_id: 'gpt-4-turbo',
-    params: { temperature: 0.7 }
-  }
+  // GPT/Chat/Reasoning models
+  { id: 'gpt-4o', name: 'GPT-4o', model_id: 'gpt-4o', params: { temperature: 0.7 } },
+  { id: 'chatgpt-4o-latest', name: 'ChatGPT-4o-latest', model_id: 'chatgpt-4o-latest', params: { temperature: 0.7 } },
+  { id: 'gpt-4o-2024-05-13', name: 'GPT-4o (2024-05-13)', model_id: 'gpt-4o-2024-05-13', params: { temperature: 0.7 } },
+  { id: 'gpt-4o-2024-08-06', name: 'GPT-4o (2024-08-06)', model_id: 'gpt-4o-2024-08-06', params: { temperature: 0.7 } },
+  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', model_id: 'gpt-4o-mini', params: { temperature: 0.7 } },
+  { id: 'gpt-4o-mini-2024-07-18', name: 'GPT-4o Mini (2024-07-18)', model_id: 'gpt-4o-mini-2024-07-18', params: { temperature: 0.7 } },
+  { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', model_id: 'gpt-4-turbo', params: { temperature: 0.7 } },
+  { id: 'gpt-4-turbo-2024-04-09', name: 'GPT-4 Turbo (2024-04-09)', model_id: 'gpt-4-turbo-2024-04-09', params: { temperature: 0.7 } },
+  { id: 'gpt-4-turbo-preview', name: 'GPT-4 Turbo Preview', model_id: 'gpt-4-turbo-preview', params: { temperature: 0.7 } },
+  { id: 'gpt-4-0125-preview', name: 'GPT-4 0125 Preview', model_id: 'gpt-4-0125-preview', params: { temperature: 0.7 } },
+  { id: 'gpt-4-1106-preview', name: 'GPT-4 1106 Preview', model_id: 'gpt-4-1106-preview', params: { temperature: 0.7 } },
+  { id: 'gpt-4-0613', name: 'GPT-4 0613', model_id: 'gpt-4-0613', params: { temperature: 0.7 } },
+  { id: 'gpt-4', name: 'GPT-4', model_id: 'gpt-4', params: { temperature: 0.7 } },
+  { id: 'gpt-4.1', name: 'GPT-4.1', model_id: 'gpt-4.1', params: { temperature: 0.7 } },
+  { id: 'gpt-4.1-2025-04-14', name: 'GPT-4.1 (2025-04-14)', model_id: 'gpt-4.1-2025-04-14', params: { temperature: 0.7 } },
+  { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', model_id: 'gpt-4.1-mini', params: { temperature: 0.7 } },
+  { id: 'gpt-4.1-mini-2025-04-14', name: 'GPT-4.1 Mini (2025-04-14)', model_id: 'gpt-4.1-mini-2025-04-14', params: { temperature: 0.7 } },
+  { id: 'gpt-4.1-nano', name: 'GPT-4.1 Nano', model_id: 'gpt-4.1-nano', params: { temperature: 0.7 } },
+  { id: 'gpt-4.1-nano-2025-04-14', name: 'GPT-4.1 Nano (2025-04-14)', model_id: 'gpt-4.1-nano-2025-04-14', params: { temperature: 0.7 } },
+  { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', model_id: 'gpt-3.5-turbo', params: { temperature: 0.7 } },
+  { id: 'gpt-3.5-turbo-0125', name: 'GPT-3.5 Turbo (0125)', model_id: 'gpt-3.5-turbo-0125', params: { temperature: 0.7 } },
+  { id: 'gpt-3.5-turbo-1106', name: 'GPT-3.5 Turbo (1106)', model_id: 'gpt-3.5-turbo-1106', params: { temperature: 0.7 } },
+  { id: 'gpt-3.5-turbo-16k', name: 'GPT-3.5 Turbo 16k', model_id: 'gpt-3.5-turbo-16k', params: { temperature: 0.7 } },
+  // O models (excluding deep research and pro variants)
+  { id: 'o1-preview', name: 'O1 Preview', model_id: 'o1-preview', params: { reasoning_effort: 'medium' } },
+  { id: 'o1-preview-2024-09-12', name: 'O1 Preview (2024-09-12)', model_id: 'o1-preview-2024-09-12', params: { reasoning_effort: 'medium' } },
+  { id: 'o1-mini', name: 'O1 Mini', model_id: 'o1-mini', params: { reasoning_effort: 'medium' } },
+  { id: 'o1-mini-2024-09-12', name: 'O1 Mini (2024-09-12)', model_id: 'o1-mini-2024-09-12', params: { reasoning_effort: 'medium' } },
+  { id: 'o1', name: 'O1', model_id: 'o1', params: { reasoning_effort: 'medium' } },
+  { id: 'o1-2024-12-17', name: 'O1 (2024-12-17)', model_id: 'o1-2024-12-17', params: { reasoning_effort: 'medium' } },
+  { id: 'o3-mini', name: 'O3 Mini', model_id: 'o3-mini', params: { reasoning_effort: 'medium' } },
+  { id: 'o3-mini-2025-01-31', name: 'O3 Mini (2025-01-31)', model_id: 'o3-mini-2025-01-31', params: { reasoning_effort: 'medium' } },
+  { id: 'o4-mini', name: 'O4 Mini', model_id: 'o4-mini', params: { reasoning_effort: 'medium' } },
+  { id: 'o4-mini-2025-04-16', name: 'O4 Mini (2025-04-16)', model_id: 'o4-mini-2025-04-16', params: { reasoning_effort: 'medium' } },
+  // If OpenAI releases a model with "reasoning" in the name, add it here.
 ];
 
 export const imageModels = [
