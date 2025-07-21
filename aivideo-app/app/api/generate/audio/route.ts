@@ -38,80 +38,14 @@ export async function POST(request: NextRequest) {
     };
 
     console.log('Starting audio generation with Thinksound...');
-    const output = await replicate.run(
-      "zsxkib/thinksound:40d08f9f569e91a5d72f6795ebed75178c185b0434699a98c07fc5f566efb2d4",
-      { input }
-    );
+    const prediction = await replicate.predictions.create({
+      version: "zsxkib/thinksound:40d08f9f569e91a5d72f6795ebed75178c185b0434699a98c07fc5f566efb2d4",
+      input,
+    });
 
-    console.log('Audio output received:');
-    console.log('- Type:', typeof output);
-    console.log('- Is Array:', Array.isArray(output));
-    console.log('- Is ReadableStream:', output instanceof ReadableStream);
-    
-    // Handle ReadableStream response (contains actual audio binary data)
-    if (output instanceof ReadableStream) {
-      console.log('Converting ReadableStream to audio data...');
-      const reader = output.getReader();
-      const chunks = [];
-      
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          chunks.push(value);
-        }
-        
-        const blob = new Blob(chunks);
-        const arrayBuffer = await blob.arrayBuffer();
-        
-        // Check if it's binary audio data (common audio formats)
-        const uint8Array = new Uint8Array(arrayBuffer);
-        const isMP3 = uint8Array[0] === 0xFF && (uint8Array[1] & 0xE0) === 0xE0; // MP3 frame header
-        const isWAV = uint8Array[0] === 0x52 && uint8Array[1] === 0x49 && uint8Array[2] === 0x46 && uint8Array[3] === 0x46; // "RIFF"
-        const isAudioData = isMP3 || isWAV;
-        
-        if (isAudioData) {
-          const mimeType = isMP3 ? 'audio/mpeg' : 'audio/wav';
-          console.log(`Detected ${mimeType} audio data, converting to base64...`);
-          // Convert binary audio data to base64 data URL
-          const base64 = Buffer.from(arrayBuffer).toString('base64');
-          const dataUrl = `data:${mimeType};base64,${base64}`;
-          console.log('Generated audio data URL, length:', dataUrl.length);
-          return NextResponse.json({ output: dataUrl });
-        } else {
-          // Try to decode as text (fallback for URL)
-          const text = new TextDecoder().decode(arrayBuffer);
-          console.log('Stream content as text:', text.substring(0, 200));
-          
-          // Try to parse as JSON or use as direct URL
-          try {
-            const parsed = JSON.parse(text);
-            console.log('Parsed stream JSON:', parsed);
-            return NextResponse.json({ output: parsed.url || parsed });
-          } catch {
-            console.log('Stream content is direct URL:', text);
-            return NextResponse.json({ output: text.trim() });
-          }
-        }
-      } finally {
-        reader.releaseLock();
-      }
-    }
-    
-    // Handle direct URL response (as expected from docs)
-    if (typeof output === 'string') {
-      console.log('Direct audio URL output:', output);
-      return NextResponse.json({ output });
-    }
-    
-    // Handle array response
-    if (Array.isArray(output) && output.length > 0) {
-      console.log('Array audio output:', output);
-      return NextResponse.json({ output: output[0] });
-    }
-    
-    console.log('Unexpected audio output format:', output);
-    return NextResponse.json({ output });
+    console.log('Prediction started:', prediction.id);
+
+    return NextResponse.json(prediction);
   } catch (error) {
     console.error('Audio generation error:', error);
     return NextResponse.json(
