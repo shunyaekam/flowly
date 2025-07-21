@@ -131,10 +131,14 @@ export async function generateStoryboard(
   }
 }
 
+type Prediction = {
+  id: string;
+};
+
 // Note: Replicate integration is now handled server-side via Next.js API routes
 
 // Image generation using Next.js API route
-export async function generateImage(prompt: string, apiKey: string): Promise<any> {
+export async function generateImage(prompt: string, apiKey: string): Promise<Prediction> {
   try {
     const response = await fetch('/api/generate/image', {
       method: 'POST',
@@ -170,7 +174,7 @@ export async function generateImage(prompt: string, apiKey: string): Promise<any
 }
 
 // Video generation using Next.js API route
-export async function generateVideo(prompt: string, imageUrl: string, apiKey: string): Promise<any> {
+export async function generateVideo(prompt: string, imageUrl: string, apiKey: string): Promise<Prediction> {
   try {
     const response = await fetch('/api/generate/video', {
       method: 'POST',
@@ -193,7 +197,7 @@ export async function generateVideo(prompt: string, imageUrl: string, apiKey: st
 }
 
 // Audio generation using Next.js API route
-export async function generateAudio(videoUrl: string, prompt: string, apiKey: string): Promise<any> {
+export async function generateAudio(videoUrl: string, prompt: string, apiKey: string): Promise<Prediction> {
   try {
     const response = await fetch('/api/generate/audio', {
       method: 'POST',

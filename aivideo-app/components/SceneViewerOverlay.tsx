@@ -83,7 +83,10 @@ export default function SceneViewerOverlay() {
     });
     
     try {
-      let prediction: any;
+      type Prediction = {
+        id: string;
+      };
+      let prediction: Prediction;
       let result: string | null = null;
       
       switch (type) {
