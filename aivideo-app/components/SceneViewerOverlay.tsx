@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAppStore, imageModels, videoModels, audioModels } from '@/lib/store';
 import { X, RefreshCw } from 'lucide-react';
-import { generateImage, generateVideo, generateAudio } from '@/lib/api';
+import { generateImage, generateVideo, generateAudio, pollForPrediction } from '@/lib/api';
 import { playSounds } from '@/lib/sounds';
 
 export default function SceneViewerOverlay() {
@@ -83,6 +83,7 @@ export default function SceneViewerOverlay() {
     });
     
     try {
+      let prediction: any;
       let result: string | null = null;
       
       switch (type) {
@@ -90,7 +91,8 @@ export default function SceneViewerOverlay() {
           if (!settings.replicate_api_key) {
             throw new Error('Please add your Replicate API key in settings');
           }
-          result = await generateImage(imagePrompt, settings.replicate_api_key);
+          prediction = await generateImage(imagePrompt, settings.replicate_api_key);
+          result = await pollForPrediction(prediction.id, settings.replicate_api_key);
           if (result) {
             updateScene(currentScene.id, {
               generated_image: result,
@@ -107,7 +109,8 @@ export default function SceneViewerOverlay() {
           if (!currentScene.generated_image) {
             throw new Error('Please generate an image first');
           }
-          result = await generateVideo(videoPrompt, currentScene.generated_image, settings.replicate_api_key);
+          prediction = await generateVideo(videoPrompt, currentScene.generated_image, settings.replicate_api_key);
+          result = await pollForPrediction(prediction.id, settings.replicate_api_key);
           if (result) {
             updateScene(currentScene.id, {
               generated_video: result,
@@ -124,7 +127,8 @@ export default function SceneViewerOverlay() {
           if (!currentScene.generated_video) {
             throw new Error('Please generate a video first');
           }
-          result = await generateAudio(currentScene.generated_video, audioPrompt, settings.replicate_api_key);
+          prediction = await generateAudio(currentScene.generated_video, audioPrompt, settings.replicate_api_key);
+          result = await pollForPrediction(prediction.id, settings.replicate_api_key);
           if (result) {
             updateScene(currentScene.id, {
               generated_sound: result,

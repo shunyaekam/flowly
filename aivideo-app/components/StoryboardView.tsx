@@ -24,7 +24,7 @@ import { ArrowLeft, Save, Settings, ChevronDown } from 'lucide-react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import SettingsModal from '@/components/SettingsModal';
 import SceneViewerOverlay from '@/components/SceneViewerOverlay';
-import { generateImage, generateVideo, generateAudio, saveProject } from '@/lib/api';
+import { generateImage, generateVideo, generateAudio, saveProject, pollForPrediction } from '@/lib/api';
 import { playSounds } from '@/lib/sounds';
 
 // Custom node component for storyboard scene cards
@@ -403,7 +403,7 @@ function StoryboardFlow() {
     if (!storyboardData) return;
     
     const scenes = storyboardData.scenes;
-    let generated = 0;
+    const generationPromises = [];
     
     try {
       for (const scene of scenes) {
@@ -415,62 +415,63 @@ function StoryboardFlow() {
         setGeneratingScene(scene.id, true);
         setGenerationProgress(`Generating ${type} for scene ${scenes.indexOf(scene) + 1}/${scenes.length}...`);
         
-        try {
-          let result: string | null = null;
-          
-          switch (type) {
-            case 'images':
-              result = await generateImage(scene.scene_image_prompt, settings.replicate_api_key);
-              if (result) {
-                updateScene(scene.id, {
-                  generated_image: result,
-                  image_generated: true
-                });
-                generated++;
-              }
-              break;
-              
-            case 'videos':
-              if (scene.generated_image) {
-                result = await generateVideo(scene.scene_video_prompt, scene.generated_image, settings.replicate_api_key);
+        const promise = (async () => {
+          try {
+            let prediction: any;
+            let result: string | null = null;
+            
+            switch (type) {
+              case 'images':
+                prediction = await generateImage(scene.scene_image_prompt, settings.replicate_api_key);
+                result = await pollForPrediction(prediction.id, settings.replicate_api_key);
                 if (result) {
                   updateScene(scene.id, {
-                    generated_video: result,
-                    video_generated: true
+                    generated_image: result,
+                    image_generated: true
                   });
-                  generated++;
                 }
-              }
-              break;
-              
-            case 'sounds':
-              if (scene.generated_video) {
-                result = await generateAudio(scene.generated_video, scene.scene_sound_prompt, settings.replicate_api_key);
-                if (result) {
-                  updateScene(scene.id, {
-                    generated_sound: result,
-                    sound_generated: true
-                  });
-                  generated++;
+                break;
+                
+              case 'videos':
+                if (scene.generated_image) {
+                  prediction = await generateVideo(scene.scene_video_prompt, scene.generated_image, settings.replicate_api_key);
+                  result = await pollForPrediction(prediction.id, settings.replicate_api_key);
+                  if (result) {
+                    updateScene(scene.id, {
+                      generated_video: result,
+                      video_generated: true
+                    });
+                  }
                 }
-              }
-              break;
+                break;
+                
+              case 'sounds':
+                if (scene.generated_video) {
+                  prediction = await generateAudio(scene.generated_video, scene.scene_sound_prompt, settings.replicate_api_key);
+                  result = await pollForPrediction(prediction.id, settings.replicate_api_key);
+                  if (result) {
+                    updateScene(scene.id, {
+                      generated_sound: result,
+                      sound_generated: true
+                    });
+                  }
+                }
+                break;
+            }
+          } catch (error) {
+            console.error(`Error generating ${type} for scene ${scene.id}:`, error);
+          } finally {
+            setGeneratingScene(scene.id, false);
           }
-        } catch (error) {
-          console.error(`Error generating ${type} for scene ${scene.id}:`, error);
-        } finally {
-          setGeneratingScene(scene.id, false);
-        }
+        })();
+        generationPromises.push(promise);
       }
       
-      if (generated > 0) {
-        setGenerationProgress(`Generated ${generated} ${type} successfully!`);
-        playSounds.ok();
-        setTimeout(() => setGenerationProgress(''), 3000);
-      } else {
-        setGenerationProgress(`All ${type} already generated or dependencies not met.`);
-        setTimeout(() => setGenerationProgress(''), 3000);
-      }
+      await Promise.all(generationPromises);
+      
+      setGenerationProgress(`Generated all ${type} successfully!`);
+      playSounds.ok();
+      setTimeout(() => setGenerationProgress(''), 3000);
     } catch (error) {
       console.error(`Error generating ${type}:`, error);
       playSounds.openOverlay();

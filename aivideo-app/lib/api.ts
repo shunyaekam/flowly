@@ -55,39 +55,7 @@ export async function generateStoryboard(
   }
 
   // Build comprehensive system prompt
-  const systemPrompt = `You are an expert video storyboard creator. Your task is to create detailed storyboards for TikTok-style videos.
-
-TOPIC PROMPT:
-${topicPrompt}
-
-GENERAL INSTRUCTIONS:
-${generalPrompt || GENERAL_PROMPT}
-
-FORMAT:
-{
-  "scenes": [
-    {
-      "scene": "Scene script",
-      "scene_image_prompt": "...",
-      "scene_video_prompt": "...",
-      "scene_sound_prompt": "..."
-    },
-    ...
-  ]
-}
-
-MODEL EXAMPLES:
-
-Image prompts should be detailed and cinematic like these examples:
-${MODEL_EXAMPLES.image_examples.map((ex, i) => `${i + 1}. ${ex}`).join('\n')}
-
-Video prompts should be simple motion descriptions like these examples:
-${MODEL_EXAMPLES.video_examples.map((ex, i) => `${i + 1}. ${ex}`).join('\n')}
-
-Sound prompts should be detailed audio descriptions like these examples:
-${MODEL_EXAMPLES.sound_examples.map((ex, i) => `${i + 1}. ${ex}`).join('\n')}
-
-IMPORTANT: Your response must be ONLY valid JSON with no additional text, explanations, or markdown formatting.`;
+  const systemPrompt = `You are an expert video storyboard creator. Your task is to create detailed storyboards for TikTok-style videos.\n\nTOPIC PROMPT:\n${topicPrompt}\n\nGENERAL INSTRUCTIONS:\n${generalPrompt || GENERAL_PROMPT}\n\nFORMAT:\n{\n  "scenes": [\n    {\n      "scene": "Scene script",\n      "scene_image_prompt": "...",\n      "scene_video_prompt": "...",\n      "scene_sound_prompt": "..."\n    },\n    ...\n  ]\n}\n\nMODEL EXAMPLES:\n\nImage prompts should be detailed and cinematic like these examples:\n${MODEL_EXAMPLES.image_examples.map((ex, i) => `${i + 1}. ${ex}`).join('\n')}\n\nVideo prompts should be simple motion descriptions like these examples:\n${MODEL_EXAMPLES.video_examples.map((ex, i) => `${i + 1}. ${ex}`).join('\n')}\n\nSound prompts should be detailed audio descriptions like these examples:\n${MODEL_EXAMPLES.sound_examples.map((ex, i) => `${i + 1}. ${ex}`).join('\n')}\n\nIMPORTANT: Your response must be ONLY valid JSON with no additional text, explanations, or markdown formatting.`;
 
   // Log the model and parameters being used
   console.log('[OpenAI API] Using model:', modelConfig.model_id, 'with params:', modelConfig.params);
@@ -166,7 +134,7 @@ IMPORTANT: Your response must be ONLY valid JSON with no additional text, explan
 // Note: Replicate integration is now handled server-side via Next.js API routes
 
 // Image generation using Next.js API route
-export async function generateImage(prompt: string, apiKey: string): Promise<string> {
+export async function generateImage(prompt: string, apiKey: string): Promise<any> {
   try {
     const response = await fetch('/api/generate/image', {
       method: 'POST',
@@ -194,21 +162,7 @@ export async function generateImage(prompt: string, apiKey: string): Promise<str
       throw new Error(errorMessage);
     }
 
-    const data = await response.json();
-    
-    console.log('Client received data:', JSON.stringify(data, null, 2));
-    
-    // Extract URL from output - prioritize .url property based on Python script
-    if (data.output && data.output.url) {
-      return data.output.url;
-    } else if (typeof data.output === 'string') {
-      return data.output;
-    } else if (Array.isArray(data.output) && data.output.length > 0) {
-      return data.output[0];
-    }
-    
-    console.error('Unexpected output format:', data.output);
-    throw new Error(`Invalid output format from image generation. Received: ${JSON.stringify(data.output)}`);
+    return await response.json();
   } catch (error) {
     console.error('Image generation error:', error);
     throw error;
@@ -216,7 +170,7 @@ export async function generateImage(prompt: string, apiKey: string): Promise<str
 }
 
 // Video generation using Next.js API route
-export async function generateVideo(prompt: string, imageUrl: string, apiKey: string): Promise<string> {
+export async function generateVideo(prompt: string, imageUrl: string, apiKey: string): Promise<any> {
   try {
     const response = await fetch('/api/generate/video', {
       method: 'POST',
@@ -228,22 +182,10 @@ export async function generateVideo(prompt: string, imageUrl: string, apiKey: st
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Failed to generate video');
+      throw new Error(error.error || 'Failed to start video generation');
     }
 
-    const data = await response.json();
-    
-    // Extract URL from output - prioritize .url property based on Python script
-    if (data.output && data.output.url) {
-      return data.output.url;
-    } else if (typeof data.output === 'string') {
-      return data.output;
-    } else if (Array.isArray(data.output) && data.output.length > 0) {
-      return data.output[0];
-    }
-    
-    console.error('Unexpected video output format:', data.output);
-    throw new Error(`Invalid output format from video generation. Received: ${JSON.stringify(data.output)}`);
+    return await response.json();
   } catch (error) {
     console.error('Video generation error:', error);
     throw error;
@@ -251,7 +193,7 @@ export async function generateVideo(prompt: string, imageUrl: string, apiKey: st
 }
 
 // Audio generation using Next.js API route
-export async function generateAudio(videoUrl: string, prompt: string, apiKey: string): Promise<string> {
+export async function generateAudio(videoUrl: string, prompt: string, apiKey: string): Promise<any> {
   try {
     const response = await fetch('/api/generate/audio', {
       method: 'POST',
@@ -263,25 +205,50 @@ export async function generateAudio(videoUrl: string, prompt: string, apiKey: st
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Failed to generate audio');
+      throw new Error(error.error || 'Failed to start audio generation');
     }
 
-    const data = await response.json();
-    
-    // Extract URL from output - prioritize .url property based on Python script
-    if (data.output && data.output.url) {
-      return data.output.url;
-    } else if (typeof data.output === 'string') {
-      return data.output;
-    } else if (Array.isArray(data.output) && data.output.length > 0) {
-      return data.output[0];
-    }
-    
-    console.error('Unexpected audio output format:', data.output);
-    throw new Error(`Invalid output format from audio generation. Received: ${JSON.stringify(data.output)}`);
+    return await response.json();
   } catch (error) {
     console.error('Audio generation error:', error);
     throw error;
+  }
+}
+
+// Poll for prediction result
+export async function pollForPrediction(predictionId: string, apiKey: string): Promise<string> {
+  while (true) {
+    try {
+      const response = await fetch(`/api/predictions/${predictionId}`, {
+        headers: {
+          'x-replicate-api-key': apiKey,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch prediction');
+      }
+
+      const prediction = await response.json();
+
+      if (prediction.status === 'succeeded') {
+        if (prediction.output && typeof prediction.output === 'string') {
+          return prediction.output;
+        } else if (Array.isArray(prediction.output) && prediction.output.length > 0) {
+          return prediction.output[0];
+        } else {
+          throw new Error('Invalid prediction output format');
+        }
+      } else if (prediction.status === 'failed' || prediction.status === 'canceled') {
+        throw new Error(`Prediction failed with status: ${prediction.status}`);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Poll every 2 seconds
+    } catch (error) {
+      console.error('Polling error:', error);
+      throw error;
+    }
   }
 }
 
@@ -437,4 +404,4 @@ export async function saveProject(storyboard: StoryboardData, scenes: Scene[]): 
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-} 
+}
