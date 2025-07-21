@@ -417,7 +417,10 @@ function StoryboardFlow() {
         
         const promise = (async () => {
           try {
-            let prediction: any;
+            type Prediction = {
+              id: string;
+            };
+            let prediction: Prediction;
             let result: string | null = null;
             
             switch (type) {
