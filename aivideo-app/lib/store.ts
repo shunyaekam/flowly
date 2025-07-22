@@ -67,6 +67,8 @@ export interface AppState {
   // Generation state
   generatingScenes: Set<string>;
   setGeneratingScene: (sceneId: string, generating: boolean) => void;
+  resetStoryboard: () => void;
+  loadInitialSettings: () => void;
 }
 
 // Available models
@@ -157,6 +159,7 @@ export const saveSettingsToStorage = (settings: Settings) => {
 
 export const loadSettingsFromStorage = (): Partial<Settings> => {
   try {
+    if (typeof window === 'undefined') return {};
     const stored = localStorage.getItem(STORAGE_KEY);
     return stored ? JSON.parse(stored) : {};
   } catch (error) {
@@ -169,7 +172,12 @@ export const loadSettingsFromStorage = (): Partial<Settings> => {
 export const useAppStore = create<AppState>((set, get) => ({
   // Navigation
   currentView: 'input',
-  setCurrentView: (view) => set({ currentView: view }),
+  setCurrentView: (view) => {
+    if (view === 'input') {
+      get().resetStoryboard();
+    }
+    set({ currentView: view })
+  },
   
   // Storyboard data
   storyboardData: null,
@@ -217,19 +225,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   
   // Settings
-  settings: (() => {
-    const stored = loadSettingsFromStorage();
-    return {
-      openai_api_key: stored.openai_api_key || '',
-      replicate_api_key: stored.replicate_api_key || '',
-      general_prompt: stored.general_prompt || GENERAL_PROMPT,
-      mode_prompts: stored.mode_prompts || {},
-      selected_storyboard_model: stored.selected_storyboard_model || 'gpt-4o',
-      selected_image_model: stored.selected_image_model || 'seedream',
-      selected_video_model: stored.selected_video_model || 'kling-2.1-pro',
-      selected_audio_model: stored.selected_audio_model || 'multi'
-    };
-  })(),
+  settings: {
+    openai_api_key: '',
+    replicate_api_key: '',
+    general_prompt: GENERAL_PROMPT,
+    mode_prompts: {},
+    selected_storyboard_model: 'gpt-4o',
+    selected_image_model: 'seedream',
+    selected_video_model: 'kling-2.1-pro',
+    selected_audio_model: 'multi'
+  },
   setSettings: (settings) => {
     saveSettingsToStorage(settings);
     set({ settings });
@@ -286,5 +291,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       newSet.delete(sceneId);
     }
     return { generatingScenes: newSet };
-  })
+  }),
+
+  resetStoryboard: () => set({ storyboardData: null, generatingScenes: new Set() }),
+
+  loadInitialSettings: () => {
+    const stored = loadSettingsFromStorage();
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        ...stored,
+        general_prompt: stored.general_prompt || GENERAL_PROMPT,
+        selected_storyboard_model: stored.selected_storyboard_model || 'gpt-4o',
+        selected_image_model: stored.selected_image_model || 'seedream',
+        selected_video_model: stored.selected_video_model || 'kling-2.1-pro',
+        selected_audio_model: stored.selected_audio_model || 'multi'
+      }
+    }));
+  }
 })); 

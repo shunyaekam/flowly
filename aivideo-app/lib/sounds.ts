@@ -5,7 +5,9 @@ class SoundManager {
 
   constructor() {
     // Preload sound effects
-    this.loadSounds();
+    if (typeof window !== 'undefined') {
+      this.loadSounds();
+    }
   }
 
   private loadSounds() {

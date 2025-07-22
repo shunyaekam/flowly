@@ -1,7 +1,11 @@
+'use client';
+
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css";
+import { useAppStore } from '@/lib/store';
+import { useEffect } from 'react';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,16 +17,19 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "flowly",
-  description: "frictionless and flexible stories",
-};
+
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const loadInitialSettings = useAppStore((state) => state.loadInitialSettings);
+
+  useEffect(() => {
+    loadInitialSettings();
+  }, [loadInitialSettings]);
+
   return (
     <html lang="en">
       <body

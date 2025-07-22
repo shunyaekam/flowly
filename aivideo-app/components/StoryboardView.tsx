@@ -52,8 +52,7 @@ function SceneNode({ data }: any) {
         type="target"
         position={Position.Left}
         id="before"
-        className="bg-transparent border-none hover:scale-110 transition-transform"
-        style={{ left: -20, width: 'auto', height: 'auto', background: 'none' }}
+        style={{ left: -20, width: 'auto', height: 'auto', background: 'none', border: 'none' }}
         title="Connect to previous scene"
       >
         <div className="text-black hover:text-gray-700 transition-colors text-lg font-light">
@@ -264,7 +263,7 @@ function StoryboardFlow() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [hasInitialized, setHasInitialized] = useState(false);
-  
+
   // Calculate current sequence for dynamic numbering
   const currentSequence = useMemo(() => {
     if (!storyboardData) return [];
@@ -650,6 +649,7 @@ function StoryboardFlow() {
           onEdgeClick={onEdgeClick}
           nodeTypes={nodeTypes}
           fitView
+          onInit={(instance) => instance.fitView()}
           fitViewOptions={{
             padding: 20,
             minZoom: 0.1,

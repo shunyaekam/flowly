@@ -44,7 +44,8 @@ export async function POST(request: NextRequest) {
     console.error('Image generation error details:', {
       message: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : 'No stack trace',
-      error: error
+      error: error,
+      requestBody: request.body // Log the request body
     });
     
     return NextResponse.json(
