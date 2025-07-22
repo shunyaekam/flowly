@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import SettingsModal from '@/components/SettingsModal';
-import { generateStoryboard, createDemoStoryboard } from '@/lib/api';
+import { generateStoryboard } from '@/lib/api';
 import { playSounds } from '@/lib/sounds';
 
 export default function InputView() {
@@ -20,7 +20,6 @@ export default function InputView() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [useDemo, setUseDemo] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize textarea
@@ -49,12 +48,8 @@ export default function InputView() {
     try {
       let storyboard;
       
-      if (useDemo || !settings.openai_api_key) {
-        // Use demo storyboard
-        storyboard = createDemoStoryboard(prompt, selectedMode);
-        
-        // Add slight delay for demo mode
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      if (!settings.openai_api_key) {
+        throw new Error('OpenAI API key not found in settings. Please add it to generate a storyboard.');
       } else {
         // Use real API
         storyboard = await generateStoryboard(
@@ -158,24 +153,12 @@ export default function InputView() {
           {isGenerating ? 'generating...' : 'generate'}
         </button>
 
-        {/* Demo Mode Toggle and API Status */}
+        {/* API Status */}
         <div className="mt-6 flex flex-col items-center gap-2">
           {!settings.openai_api_key && (
             <p className="text-xs text-gray-500">
-              No OpenAI API key found in settings. Using demo mode.
+              No OpenAI API key found in settings. Generation features will be limited.
             </p>
-          )}
-          
-          {settings.openai_api_key && (
-            <label className="flex items-center gap-2 text-xs text-gray-500">
-              <input
-                type="checkbox"
-                checked={useDemo}
-                onChange={(e) => setUseDemo(e.target.checked)}
-                className="w-3 h-3"
-              />
-              Use demo mode
-            </label>
           )}
           
           {!settings.replicate_api_key && (
