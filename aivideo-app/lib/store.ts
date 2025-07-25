@@ -64,9 +64,22 @@ export interface AppState {
   sceneViewTab: 'script' | 'image' | 'video' | 'audio';
   setSceneViewTab: (tab: 'script' | 'image' | 'video' | 'audio') => void;
   
+  // Visual scene order (follows React Flow connections)
+  visualSceneOrder: Scene[];
+  setVisualSceneOrder: (scenes: Scene[]) => void;
+  
   // Generation state
   generatingScenes: Set<string>;
   setGeneratingScene: (sceneId: string, generating: boolean) => void;
+  
+  // Enhanced generation state management
+  sceneGenerationStates: Map<string, Map<'image' | 'video' | 'audio', boolean>>;
+  generationCancellation: Map<string, AbortController>;
+  generateAllCancelled: boolean;
+  setSceneGenerationState: (sceneId: string, type: 'image' | 'video' | 'audio', generating: boolean) => void;
+  getSceneGenerationState: (sceneId: string, type: 'image' | 'video' | 'audio') => boolean;
+  cancelGeneration: (sceneId: string, type: 'image' | 'video' | 'audio') => void;
+  setGenerateAllCancelled: (cancelled: boolean) => void;
   resetStoryboard: () => void;
   loadInitialSettings: () => void;
 }
@@ -281,6 +294,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   sceneViewTab: 'image',
   setSceneViewTab: (tab) => set({ sceneViewTab: tab }),
   
+  // Visual scene order
+  visualSceneOrder: [],
+  setVisualSceneOrder: (scenes) => set({ visualSceneOrder: scenes }),
+  
   // Generation state
   generatingScenes: new Set(),
   setGeneratingScene: (sceneId, generating) => set((state) => {
@@ -292,8 +309,75 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     return { generatingScenes: newSet };
   }),
+  
+  // Enhanced generation state management
+  sceneGenerationStates: new Map(),
+  generationCancellation: new Map(),
+  generateAllCancelled: false,
+  
+  setSceneGenerationState: (sceneId, type, generating) => set((state) => {
+    const newStates = new Map(state.sceneGenerationStates);
+    if (!newStates.has(sceneId)) {
+      newStates.set(sceneId, new Map());
+    }
+    newStates.get(sceneId)!.set(type, generating);
+    
+    // Also update the cancellation map
+    const newCancellation = new Map(state.generationCancellation);
+    const key = `${sceneId}-${type}`;
+    
+    if (generating && !newCancellation.has(key)) {
+      newCancellation.set(key, new AbortController());
+    } else if (!generating && newCancellation.has(key)) {
+      newCancellation.delete(key);
+    }
+    
+    return { 
+      sceneGenerationStates: newStates,
+      generationCancellation: newCancellation 
+    };
+  }),
+  
+  getSceneGenerationState: (sceneId, type) => {
+    const state = get();
+    return state.sceneGenerationStates.get(sceneId)?.get(type) || false;
+  },
+  
+  cancelGeneration: (sceneId, type) => {
+    const state = get();
+    const key = `${sceneId}-${type}`;
+    const controller = state.generationCancellation.get(key);
+    
+    if (controller && !controller.signal.aborted) {
+      controller.abort();
+      
+      // Immediately update the state
+      set((currentState) => {
+        const newStates = new Map(currentState.sceneGenerationStates);
+        if (newStates.has(sceneId)) {
+          newStates.get(sceneId)!.set(type, false);
+        }
+        
+        const newCancellation = new Map(currentState.generationCancellation);
+        newCancellation.delete(key);
+        
+        return {
+          sceneGenerationStates: newStates,
+          generationCancellation: newCancellation
+        };
+      });
+    }
+  },
 
-  resetStoryboard: () => set({ storyboardData: null, generatingScenes: new Set() }),
+  setGenerateAllCancelled: (cancelled) => set({ generateAllCancelled: cancelled }),
+
+  resetStoryboard: () => set({ 
+    storyboardData: null, 
+    generatingScenes: new Set(),
+    sceneGenerationStates: new Map(),
+    generationCancellation: new Map(),
+    generateAllCancelled: false
+  }),
 
   loadInitialSettings: () => {
     const stored = loadSettingsFromStorage();

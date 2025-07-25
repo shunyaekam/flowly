@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState, useEffect } from 'react';
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import {
   ReactFlow,
   Node,
@@ -15,12 +15,10 @@ import {
   ReactFlowProvider,
   addEdge,
   Connection,
-  MarkerType,
-  useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useAppStore, Scene } from '@/lib/store';
-import { ArrowLeft, Save, Settings, ChevronDown } from 'lucide-react';
+import { ArrowLeft, ChevronDown } from 'lucide-react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import SettingsModal from '@/components/SettingsModal';
 import SceneViewerOverlay from '@/components/SceneViewerOverlay';
@@ -32,7 +30,13 @@ import { playSounds } from '@/lib/sounds';
 function SceneNode({ data }: any) {
   const { scene, sequenceNumber = 0 } = data;
   const hasMedia = scene.generated_image || scene.generated_video;
-  const { setEditingSceneId } = useAppStore();
+  const { setEditingSceneId, getSceneGenerationState } = useAppStore();
+  
+  // Check if any content is generating for this scene
+  const isGeneratingImage = getSceneGenerationState(scene.id, 'image');
+  const isGeneratingVideo = getSceneGenerationState(scene.id, 'video');
+  const isGeneratingAudio = getSceneGenerationState(scene.id, 'audio');
+  const isGeneratingAny = isGeneratingImage || isGeneratingVideo || isGeneratingAudio;
   
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -59,6 +63,19 @@ function SceneNode({ data }: any) {
           &gt;
         </div>
       </Handle>
+      
+      {/* Glow effect wrapper (only visible when generating) */}
+      {isGeneratingAny && (
+        <div 
+          className="absolute inset-0 rounded-full animate-pulse"
+          style={{
+            background: 'radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.1) 70%, transparent 100%)',
+            filter: 'blur(3px)',
+            transform: 'scale(1.3)',
+            zIndex: -1,
+          }}
+        />
+      )}
       
       {/* Scene card */}
       <div 
@@ -181,11 +198,17 @@ function getFlowSequence(scenes: Scene[], edges: Edge[]): Scene[] {
 }
 
 function StoryboardFlow() {
-  const { storyboardData, setCurrentView, updateScenePosition, updateScene, settings, setGeneratingScene } = useAppStore();
+  const { storyboardData, setCurrentView, updateScenePosition, updateScene, settings, setSceneGenerationState, generationCancellation, getSceneGenerationState, cancelGeneration, setVisualSceneOrder, generateAllCancelled, setGenerateAllCancelled } = useAppStore();
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
-  const [generationProgress, setGenerationProgress] = useState<string>('');
-  const { fitView } = useReactFlow();
+  const [showRegenerateDialog, setShowRegenerateDialog] = useState<'images' | 'videos' | 'sounds' | null>(null);
+  const generateAllCancelledRef = useRef(false);
+  const [activePredictions, setActivePredictions] = useState<Map<string, string>>(new Map()); // Map scene-type to prediction ID
+
+  // Keep the ref in sync with the store
+  useEffect(() => {
+    generateAllCancelledRef.current = generateAllCancelled;
+  }, [generateAllCancelled]);
 
   // Play storyboard sound when entering this view
   useEffect(() => {
@@ -269,6 +292,11 @@ function StoryboardFlow() {
     if (!storyboardData) return [];
     return getFlowSequence(storyboardData.scenes, edges);
   }, [storyboardData, edges]);
+  
+  // Update the global visual scene order in useEffect to avoid render issues
+  useEffect(() => {
+    setVisualSceneOrder(currentSequence);
+  }, [currentSequence, setVisualSceneOrder]);
   
   // Create sequence number mapping
   const sequenceNumbers = useMemo(() => {
@@ -371,29 +399,83 @@ function StoryboardFlow() {
     
     if (!storyboardData) return;
     
+    // If already generating, allow cancellation
+    if (isGeneratingAll) {
+      setIsGeneratingAll(false);
+      setGenerateAllCancelled(true);
+      generateAllCancelledRef.current = true;
+      
+      // Cancel all ongoing Replicate predictions
+      activePredictions.forEach(async (predictionId, key) => {
+        if (settings.replicate_api_key) {
+          try {
+            await fetch(`/api/predictions/${predictionId}/cancel`, {
+              method: 'POST',
+              headers: {
+                'x-replicate-api-key': settings.replicate_api_key,
+              },
+            });
+          } catch (error) {
+            console.log('Replicate cancellation note:', error);
+          }
+        }
+      });
+      
+      // Cancel all ongoing generations in the store
+      if (storyboardData) {
+        storyboardData.scenes.forEach(scene => {
+          ['image', 'video', 'audio'].forEach(type => {
+            if (getSceneGenerationState(scene.id, type as 'image' | 'video' | 'audio')) {
+              cancelGeneration(scene.id, type as 'image' | 'video' | 'audio');
+            }
+          });
+        });
+      }
+      
+      // Clear prediction tracking
+      setActivePredictions(new Map());
+      
+      playSounds.cancel();
+      return;
+    }
+    
     setIsGeneratingAll(true);
+    setGenerateAllCancelled(false);
+    generateAllCancelledRef.current = false;
     
     try {
-      // Generate all images first
-      await handleGenerateSpecific('images');
-      // Then videos
-      await handleGenerateSpecific('videos');
-      // Then sounds
-      await handleGenerateSpecific('sounds');
+      const scenes = storyboardData.scenes;
       
-      setGenerationProgress('All content generated successfully!');
+      // Determine the next logical step
+      const allHaveImages = scenes.every(scene => scene.image_generated);
+      const allHaveVideos = scenes.every(scene => scene.video_generated || !scene.generated_image);
+      
+      if (!allHaveImages) {
+        // Generate missing images
+        await handleGenerateSpecific('images');
+      } else if (!allHaveVideos) {
+        // Generate missing videos
+        await handleGenerateSpecific('videos');
+      } else {
+        // Generate missing sounds
+        await handleGenerateSpecific('sounds');
+      }
+      
       playSounds.ok();
     } catch (error) {
-      console.error('Error generating all content:', error);
+      console.error('Error generating content:', error);
       playSounds.openOverlay();
-      alert(error instanceof Error ? error.message : 'Failed to generate all content');
+      alert(error instanceof Error ? error.message : 'Failed to generate content');
     } finally {
       setIsGeneratingAll(false);
-      setTimeout(() => setGenerationProgress(''), 3000);
+      // Reset cancellation flag when done
+      if (!generateAllCancelledRef.current) {
+        setGenerateAllCancelled(false);
+      }
     }
   };
   
-  const handleGenerateSpecific = async (type: 'images' | 'videos' | 'sounds') => {
+  const handleGenerateSpecific = async (type: 'images' | 'videos' | 'sounds', forceRegenerate = false) => {
     if (!settings.replicate_api_key) {
       alert('Please add your Replicate API key in settings to generate content');
       return;
@@ -401,21 +483,69 @@ function StoryboardFlow() {
     
     if (!storyboardData) return;
     
+    // Reset cancellation flag when starting new generation
+    setGenerateAllCancelled(false);
+    generateAllCancelledRef.current = false;
+    
     const scenes = storyboardData.scenes;
+    
+    // Check what content exists
+    const hasAnyMissing = scenes.some(scene => {
+      if (type === 'images') return !scene.image_generated;
+      if (type === 'videos') return !scene.video_generated && scene.generated_image;
+      if (type === 'sounds') return !scene.sound_generated && scene.generated_video;
+      return false;
+    });
+    
+    const hasAllExisting = scenes.every(scene => {
+      if (type === 'images') return scene.image_generated;
+      if (type === 'videos') return scene.video_generated || !scene.generated_image; // Only count scenes with images
+      if (type === 'sounds') return scene.sound_generated || !scene.generated_video; // Only count scenes with videos
+      return false;
+    });
+    
+    // If all content exists and not forcing regeneration, show dialog
+    if (hasAllExisting && !hasAnyMissing && !forceRegenerate) {
+      setShowRegenerateDialog(type);
+      return;
+    }
+    
     const generationPromises = [];
     
     try {
       for (const scene of scenes) {
-        // Skip if already generated or dependencies not met
-        if (type === 'images' && scene.image_generated) continue;
-        if (type === 'videos' && (scene.video_generated || !scene.generated_image)) continue;
-        if (type === 'sounds' && (scene.sound_generated || !scene.generated_video)) continue;
+        // Check if generate all was cancelled
+        if (generateAllCancelledRef.current) {
+          break;
+        }
         
-        setGeneratingScene(scene.id, true);
-        setGenerationProgress(`Generating ${type} for scene ${scenes.indexOf(scene) + 1}/${scenes.length}...`);
+        const contentType = type.slice(0, -1) as 'image' | 'video' | 'audio'; // Remove 's' from type
+        
+        // Skip based on conditions
+        if (!forceRegenerate) {
+          if (type === 'images' && scene.image_generated) continue;
+          if (type === 'videos' && (scene.video_generated || !scene.generated_image)) continue;
+          if (type === 'sounds' && (scene.sound_generated || !scene.generated_video)) continue;
+        } else {
+          // For forced regeneration, still respect dependencies
+          if (type === 'videos' && !scene.generated_image) continue;
+          if (type === 'sounds' && !scene.generated_video) continue;
+        }
+        
+        setSceneGenerationState(scene.id, contentType, true);
         
         const promise = (async () => {
           try {
+            // Check if generate all was cancelled before starting
+            if (generateAllCancelledRef.current) {
+              return;
+            }
+            
+            // Get the abort controller for this generation
+            const key = `${scene.id}-${contentType}`;
+            const controller = generationCancellation.get(key);
+            const signal = controller?.signal;
+            
             type Prediction = {
               id: string;
             };
@@ -424,8 +554,16 @@ function StoryboardFlow() {
             
             switch (type) {
               case 'images':
-                prediction = await generateImage(scene.scene_image_prompt, settings.replicate_api_key);
-                result = await pollForPrediction(prediction.id, settings.replicate_api_key);
+                prediction = await generateImage(scene.scene_image_prompt, settings.replicate_api_key, signal);
+                
+                // Track the prediction ID
+                setActivePredictions(prev => {
+                  const newMap = new Map(prev);
+                  newMap.set(key, prediction.id);
+                  return newMap;
+                });
+                
+                result = await pollForPrediction(prediction.id, settings.replicate_api_key, signal);
                 if (result) {
                   updateScene(scene.id, {
                     generated_image: result,
@@ -436,8 +574,16 @@ function StoryboardFlow() {
                 
               case 'videos':
                 if (scene.generated_image) {
-                  prediction = await generateVideo(scene.scene_video_prompt, scene.generated_image, settings.replicate_api_key);
-                  result = await pollForPrediction(prediction.id, settings.replicate_api_key);
+                  prediction = await generateVideo(scene.scene_video_prompt, scene.generated_image, settings.replicate_api_key, signal);
+                  
+                  // Track the prediction ID
+                  setActivePredictions(prev => {
+                    const newMap = new Map(prev);
+                    newMap.set(key, prediction.id);
+                    return newMap;
+                  });
+                  
+                  result = await pollForPrediction(prediction.id, settings.replicate_api_key, signal);
                   if (result) {
                     updateScene(scene.id, {
                       generated_video: result,
@@ -449,8 +595,16 @@ function StoryboardFlow() {
                 
               case 'sounds':
                 if (scene.generated_video) {
-                  prediction = await generateAudio(scene.generated_video, scene.scene_sound_prompt, settings.replicate_api_key);
-                  result = await pollForPrediction(prediction.id, settings.replicate_api_key);
+                  prediction = await generateAudio(scene.generated_video, scene.scene_sound_prompt, settings.replicate_api_key, signal);
+                  
+                  // Track the prediction ID
+                  setActivePredictions(prev => {
+                    const newMap = new Map(prev);
+                    newMap.set(key, prediction.id);
+                    return newMap;
+                  });
+                  
+                  result = await pollForPrediction(prediction.id, settings.replicate_api_key, signal);
                   if (result) {
                     updateScene(scene.id, {
                       generated_sound: result,
@@ -462,18 +616,26 @@ function StoryboardFlow() {
             }
           } catch (error) {
             console.error(`Error generating ${type} for scene ${scene.id}:`, error);
+            if (!(error instanceof Error && (error.message.includes('cancelled') || error.message.includes('aborted')))) {
+              // Only log non-cancellation errors
+              playSounds.openOverlay();
+            }
           } finally {
-            setGeneratingScene(scene.id, false);
+            setSceneGenerationState(scene.id, contentType, false);
+            
+            // Clean up prediction tracking
+            const key = `${scene.id}-${contentType}`;
+            setActivePredictions(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(key);
+              return newMap;
+            });
           }
         })();
         generationPromises.push(promise);
       }
       
       await Promise.all(generationPromises);
-      
-      setGenerationProgress(`Generated all ${type} successfully!`);
-      playSounds.ok();
-      setTimeout(() => setGenerationProgress(''), 3000);
     } catch (error) {
       console.error(`Error generating ${type}:`, error);
       playSounds.openOverlay();
@@ -485,8 +647,6 @@ function StoryboardFlow() {
     if (!storyboardData) return;
     
     try {
-      setGenerationProgress('Preparing project for download...');
-      
       // Get the visual flow sequence instead of original order
       const orderedScenes = getFlowSequence(storyboardData.scenes, edges);
       
@@ -503,13 +663,11 @@ function StoryboardFlow() {
       console.log('Current edges:', edges);
       
       await saveProject(storyboardData, scenesWithUpdatedIds);
-      setGenerationProgress('Project saved successfully!');
+      playSounds.ok();
     } catch (error) {
       console.error('Error saving project:', error);
       playSounds.openOverlay();
       alert(error instanceof Error ? error.message : 'Failed to save project');
-    } finally {
-      setTimeout(() => setGenerationProgress(''), 3000);
     }
   };
   
@@ -519,13 +677,6 @@ function StoryboardFlow() {
   
   return (
     <div className="w-full h-screen flex flex-col bg-white">
-      {/* Progress Indicator */}
-      {generationProgress && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-black/80 text-white px-6 py-3 rounded-full text-sm">
-          {generationProgress}
-        </div>
-      )}
-      
       {/* Top Navigation - No shadow/border */}
       <div className="bg-white z-10">
         <div className="flex items-center justify-between px-8 py-4">
@@ -545,11 +696,10 @@ function StoryboardFlow() {
           <div className="flex items-center gap-2">
             <button
               onClick={handleGenerateAll}
-              onMouseEnter={() => !isGeneratingAll && playSounds.hover()}
-              disabled={isGeneratingAll}
-              className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors disabled:opacity-50"
+              onMouseEnter={() => playSounds.hover()}
+              className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
             >
-              {isGeneratingAll ? 'generating...' : 'generate all'}
+              {isGeneratingAll ? 'stop generation' : 'generate all'}
             </button>
             
             <DropdownMenu.Root>
@@ -688,6 +838,48 @@ function StoryboardFlow() {
       
       {/* Scene Viewer Overlay */}
       <SceneViewerOverlay />
+      
+      {/* Regeneration Confirmation Dialog */}
+      {showRegenerateDialog && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-lg backdrop-clickable flex items-center justify-center"
+          onClick={(e) => {
+            if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('backdrop-clickable')) {
+              setShowRegenerateDialog(null);
+            }
+          }}
+        >
+          <div className="backdrop-clickable p-6 max-w-md mx-4">
+            <h3 className="text-2xl font-light text-white mb-6">
+              all {showRegenerateDialog} already exist
+            </h3>
+            <p className="text-white/70 mb-8 leading-relaxed">
+              all scenes already have {showRegenerateDialog}. would you like to regenerate them?
+            </p>
+            <div className="flex gap-6 justify-end">
+              <button
+                onClick={() => setShowRegenerateDialog(null)}
+                onMouseEnter={() => playSounds.hover()}
+                className="text-sm text-white/70 hover:text-white transition-colors"
+              >
+                cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (showRegenerateDialog) {
+                    handleGenerateSpecific(showRegenerateDialog, true);
+                    setShowRegenerateDialog(null);
+                  }
+                }}
+                onMouseEnter={() => playSounds.hover()}
+                className="text-sm text-white hover:text-white/80 transition-colors"
+              >
+                regenerate all
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
