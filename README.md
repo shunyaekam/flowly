@@ -1,265 +1,81 @@
-# 🎬 AI Video Generator - Create Professional Videos with AI
+# flowly
 
-> **✨ Try it live at: [https://flowly.studio/](https://flowly.studio/)**
+frictionless and flexible ai video generation.
 
-Transform your ideas into professional videos using artificial intelligence! This tool helps you create complete video storyboards with AI-generated images, videos, and audio - no video editing experience required.
+live at [flowly.studio](https://flowly.studio)
 
-## 🌟 What Does This Do?
+## features
 
-Imagine you have an idea for a video but don't know how to make it. This tool:
+**visual storyboard editor**  
+drag and connect scenes to define your video flow. reorder scenes by connecting edges between nodes.
 
-1. **Takes your text description** (like "a mystery about ancient pyramids")
-2. **Creates a complete video script** broken into scenes
-3. **Generates images** for each scene using AI
-4. **Creates videos** from those images with motion
-5. **Adds appropriate sound effects and music**
-6. **Packages everything** for you to download
+**intelligent batch generation**  
+automatically detects what content is missing and generates in the correct order (images → videos → audio).
 
-**Perfect for**: Content creators, educators, marketers, storytellers, or anyone who wants to create videos without complex software.
+**real-time cancellation**  
+stop individual scenes or entire batch operations mid-generation via replicate api integration.
 
----
+**adaptive scene navigation**  
+navigate between scenes following your visual flow arrangement, not just array order.
 
-## 🚀 Quick Start (No Setup Required!)
+**persistent project state**  
+all scene data, positions, and generated content saved locally with export functionality.
 
-### **Option 1: Use the Live Web App (Recommended)**
+**flexible prompt customization**  
+edit general instructions and mode-specific prompts for different video styles.
 
-1. **Visit**: [https://flowly.studio/](https://flowly.studio/)
-2. **Describe your video**: Type what you want (e.g., "A short educational video about climate change")
-3. **Choose a style**: Educational, storytelling, motivational, or conspiracy theory
-4. **Generate**: Click "generate" and watch the magic happen!
-5. **Download**: Get your complete video project as a ZIP file
+**model selection**  
+choose from multiple ai models for images, videos, and audio generation.
 
-**That's it!** No installation, no setup, just create.
+## installation
 
----
+### for beginners
 
-## 📁 What's in This Repository?
+1. **install node.js**  
+   download and install from [nodejs.org](https://nodejs.org) (choose the lts version)
 
-This repository contains multiple versions of the AI video generator:
+2. **download the code**  
+   click the green "code" button on this page, then "download zip". extract the folder.
 
-```
-📦 aivideo/
-├── 🌐 aivideo-app/          # Main web application (what you see at flowly-one.vercel.app)
-├── 🐍 Python script/        # Original Python version (for developers)
-├── 🎛️ streamlit/           # Alternative web interface using Streamlit
-├── 🔊 sound effects/        # Audio files used in the web app
-├── 🎬 final_videos/         # Example output videos
-├── 📄 input-example.tsx     # Code example for developers
-└── 📖 README.md            # This file!
-```
+3. **open terminal**  
+   - **windows**: press `win + r`, type `cmd`, press enter
+   - **mac**: press `cmd + space`, type `terminal`, press enter
+   - **linux**: press `ctrl + alt + t`
 
-### **Which Version Should You Use?**
+4. **navigate to the folder**  
+   type `cd ` (with a space) then drag the extracted folder into the terminal window. press enter.
 
-- **🌐 Web App** (`aivideo-app/`): **Most users start here** - No setup required, just visit the website
-- **🎛️ Streamlit** (`streamlit/`): Alternative interface, requires some setup
-- **🐍 Python Script** (`Python script/`): For developers who want to customize the code
+5. **install dependencies**  
+   ```
+   npm install
+   ```
 
----
+6. **start the app**  
+   ```
+   npm run dev
+   ```
 
-## 🎯 How to Use the Web App
+7. **open your browser**  
+   go to `http://localhost:3000`
 
-### **Step 1: Describe Your Video**
-Type a description of what you want. Examples:
-- "A 30-second video explaining how plants grow"
-- "A mysterious story about a lost civilization"  
-- "An inspiring video about overcoming challenges"
+8. **add your api keys**  
+   click "settings" and add your replicate api key (required) and openai api key (optional).
 
-### **Step 2: Choose Your Style**
-- **📚 Educational**: Clear, informative content
-- **📖 Storytelling**: Narrative-driven with plot
-- **💪 Motivational**: Inspiring and uplifting
-- **🕵️ Conspiracy**: Mysterious and intriguing
+### api keys
 
-### **Step 3: Generate Content**
-The AI will create:
-- **Script**: Complete narration broken into scenes
-- **Images**: AI-generated visuals for each scene  
-- **Videos**: Motion added to images
-- **Audio**: Sound effects and music
+- **replicate**: sign up at [replicate.com](https://replicate.com), go to account settings, copy your api token
+- **openai**: sign up at [platform.openai.com](https://platform.openai.com), create an api key
 
-### **Step 4: Customize (Optional)**
-- **Edit scenes**: Double-click any scene to modify
-- **Rearrange order**: Drag scenes to reorder
-- **Regenerate content**: Don't like something? Generate new versions
+## experimental code
 
-### **Step 5: Download**
-Get a ZIP file containing:
-- All video files
-- Audio files
-- Images
-- Complete project data
+the `/Experimental Implementations` folder contains deprecated python scripts that were used for initial prototyping. these scripts tested various ai models and generation workflows before the main web application was built. they are no longer maintained but kept for reference.
 
----
+## tech stack
 
-## 🛠️ Running Your Own Copy
-
-Want to modify the app or run it locally? Here's how:
-
-### **Prerequisites (What You Need)**
-- A computer (Mac, Windows, or Linux)
-- Internet connection
-- About 30 minutes of setup time
-
-### **Step 1: Get the Code**
-```bash
-# Copy this repository to your computer
-git clone https://github.com/yourusername/aivideo.git
-cd aivideo/aivideo-app
-```
-
-### **Step 2: Install Requirements**
-```bash
-# Install the tools needed to run the app
-npm install
-```
-
-### **Step 3: Get API Keys**
-The app needs permission to use AI services:
-
-1. **OpenAI** (for script generation):
-   - Go to [platform.openai.com](https://platform.openai.com/api-keys)
-   - Create an account and get an API key
-   - Starts with `sk-...`
-
-2. **Replicate** (for image/video/audio generation):
-   - Go to [replicate.com](https://replicate.com/account/api-tokens)
-   - Create an account and get an API token
-   - Starts with `r8_...`
-
-### **Step 4: Run the App**
-```bash
-# Start the application
-npm run dev
-```
-
-Open your browser to `http://localhost:3000`
-
----
-
-## 💰 Cost Information
-
-### **Using AI Services**
-The app uses external AI services that charge based on usage:
-
-- **OpenAI**: ~$0.01-0.05 per video script
-- **Replicate**: ~$0.50-2.00 per video (depending on length and quality)
-
-### **Free Alternatives**
-- **Demo Mode**: Try the app without API keys (limited features)
-- **Live Website**: Use the hosted version at [flowly-one.vercel.app](https://flowly-one.vercel.app)
-
----
-
-## 🤝 Alternative Versions
-
-### **🎛️ Streamlit Version**
-A simpler interface for basic video generation:
-```bash
-cd streamlit/
-pip install -r requirements.txt
-streamlit run app.py
-```
-
-### **🐍 Python Script**
-Direct command-line tool for developers:
-```bash
-cd "Python script/"
-pip install -r requirements.txt
-python main.py
-```
-
----
-
-## 🆘 Troubleshooting
-
-### **"No API key found"**
-- Add your API keys in the Settings menu (top right)
-- Or try Demo Mode for basic functionality
-
-### **"Generation failed"**
-- Check your internet connection
-- Verify your API keys are correct
-- Make sure you have credits in your AI service accounts
-
-### **App won't start**
-- Make sure you have Node.js installed
-- Try deleting `node_modules/` and running `npm install` again
-- Check the terminal for error messages
-
-### **Need Help?**
-- Check the `ENV_SETUP.md` file for detailed setup instructions
-- Look in the `streamlit/README_GUI.md` for alternative setup
-- Create an issue on GitHub if you're stuck
-
----
-
-## 🎨 Features Overview
-
-### **🧠 AI-Powered**
-- **Script Generation**: OpenAI creates engaging narratives
-- **Image Creation**: Replicate generates cinematic visuals
-- **Video Animation**: Adds motion and life to static images
-- **Audio Generation**: Creates matching soundtracks and effects
-
-### **🎛️ User-Friendly Interface**
-- **Visual Storyboard**: See your entire video at a glance
-- **Drag & Drop**: Reorder scenes by dragging
-- **Real-time Preview**: See changes instantly
-- **Sound Effects**: Interactive audio feedback
-
-### **💾 Project Management**
-- **Save & Load**: Keep your projects organized
-- **Export Options**: Download in multiple formats
-- **Batch Generation**: Create all content at once
-- **Individual Control**: Fine-tune each scene separately
-
----
-
-## 🚀 Deployment
-
-Want to host your own version online?
-
-### **Easy Option: Vercel**
-```bash
-# Install Vercel CLI
-npm install -g vercel
-
-# Deploy from the aivideo-app directory
-cd aivideo-app
-vercel
-```
-
-### **Other Platforms**
-- **Netlify**: Drag & drop deployment
-- **Railway**: GitHub integration
-- **Render**: Automatic deployments
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🌟 Contributing
-
-Want to improve the app? 
-1. Fork this repository
-2. Make your changes
-3. Submit a pull request
-
-We welcome all contributions, from bug fixes to new features!
-
----
-
-## 🔗 Links
-
-- **🌐 Live Demo**: [https://flowly.studio/](https://flowly.studio/)
-- **📚 Documentation**: See individual folder READMEs for technical details
-- **🐛 Report Issues**: Use GitHub Issues for bugs or feature requests
-
----
-
-*Made with ❤️ for creators who want to bring their stories to life with AI*
---
+- **next.js 15** - react framework
+- **typescript** - type safety
+- **zustand** - state management
+- **react flow** - visual node editor
+- **tailwind css** - styling
+- **replicate api** - ai model hosting
+- **openai api** - language models
