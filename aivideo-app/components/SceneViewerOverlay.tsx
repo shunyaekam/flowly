@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAppStore, imageModels, videoModels, audioModels } from '@/lib/store';
-import { X, RefreshCw } from 'lucide-react';
+import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { generateImage, generateVideo, generateAudio, pollForPrediction } from '@/lib/api';
 import { playSounds } from '@/lib/sounds';
 
@@ -14,11 +14,20 @@ export default function SceneViewerOverlay() {
     setSceneViewTab,
     storyboardData,
     updateScene,
-    settings
+    settings,
+    setSceneGenerationState,
+    getSceneGenerationState,
+    cancelGeneration,
+    generationCancellation,
+    visualSceneOrder
   } = useAppStore();
   
   // Find the current scene being edited
   const currentScene = storyboardData?.scenes.find(s => s.id === editingSceneId);
+  
+  // Use visual scene order for navigation
+  const currentSceneIndex = visualSceneOrder.findIndex(s => s.id === editingSceneId) ?? -1;
+  const totalScenes = visualSceneOrder.length;
   
   // Local state for editing
   const [scriptText, setScriptText] = useState('');
@@ -28,7 +37,8 @@ export default function SceneViewerOverlay() {
   const [selectedImageModel, setSelectedImageModel] = useState(settings.selected_image_model);
   const [selectedVideoModel, setSelectedVideoModel] = useState(settings.selected_video_model);
   const [selectedAudioModel, setSelectedAudioModel] = useState(settings.selected_audio_model);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState<'image' | 'video' | 'audio' | null>(null);
+  const [activePredictions, setActivePredictions] = useState<Map<string, string>>(new Map()); // Map scene-type to prediction ID
   
   // Initialize local state when scene changes
   useEffect(() => {
@@ -67,12 +77,81 @@ export default function SceneViewerOverlay() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
   
+  // Navigation functions
+  const navigateToScene = (direction: 'prev' | 'next') => {
+    if (!visualSceneOrder.length) return;
+    
+    const newIndex = direction === 'prev' ? currentSceneIndex - 1 : currentSceneIndex + 1;
+    if (newIndex >= 0 && newIndex < totalScenes) {
+      // Save current scene changes before navigating
+      if (currentScene) {
+        updateScene(currentScene.id, {
+          scene: scriptText,
+          scene_image_prompt: imagePrompt,
+          scene_video_prompt: videoPrompt,
+          scene_sound_prompt: audioPrompt
+        });
+      }
+      
+      const newScene = visualSceneOrder[newIndex];
+      setEditingSceneId(newScene.id);
+      playSounds.option();
+    }
+  };
+  
   // Don't render if no scene is being edited
   if (!editingSceneId || !currentScene) return null;
   
+  // Handle cancellation
+  const handleCancelGeneration = async (type: 'image' | 'video' | 'audio') => {
+    if (currentScene) {
+      const key = `${currentScene.id}-${type}`;
+      const predictionId = activePredictions.get(key);
+      
+      // Cancel the Replicate prediction if it exists
+      if (predictionId && settings.replicate_api_key) {
+        try {
+          const response = await fetch(`/api/predictions/${predictionId}/cancel`, {
+            method: 'POST',
+            headers: {
+              'x-replicate-api-key': settings.replicate_api_key,
+            },
+          });
+          
+          if (!response.ok) {
+            // Log but don't show error to user - cancellation UI feedback is more important
+            console.log('Replicate cancellation response:', response.status);
+          }
+        } catch (error) {
+          // Log but don't show error to user - cancellation UI feedback is more important
+          console.log('Cancellation request note:', error);
+        }
+      }
+      
+      // Remove from active predictions
+      setActivePredictions(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(key);
+        return newMap;
+      });
+      
+      cancelGeneration(currentScene.id, type);
+      playSounds.cancel();
+      setShowCancelDialog(null);
+    }
+  };
+
   // Handle generate/regenerate
   const handleGenerate = async (type: 'image' | 'video' | 'audio') => {
-    setIsGenerating(true);
+    if (!currentScene) return;
+    
+    // If already generating, show cancel dialog
+    if (getSceneGenerationState(currentScene.id, type)) {
+      setShowCancelDialog(type);
+      return;
+    }
+    
+    setSceneGenerationState(currentScene.id, type, true);
     
     // Save prompts before generating
     updateScene(currentScene.id, {
@@ -83,6 +162,11 @@ export default function SceneViewerOverlay() {
     });
     
     try {
+      // Get the abort controller for this generation
+      const key = `${currentScene.id}-${type}`;
+      const controller = generationCancellation.get(key);
+      const signal = controller?.signal;
+      
       type Prediction = {
         id: string;
       };
@@ -94,8 +178,16 @@ export default function SceneViewerOverlay() {
           if (!settings.replicate_api_key) {
             throw new Error('Please add your Replicate API key in settings');
           }
-          prediction = await generateImage(imagePrompt, settings.replicate_api_key);
-          result = await pollForPrediction(prediction.id, settings.replicate_api_key);
+          prediction = await generateImage(imagePrompt, settings.replicate_api_key, signal);
+          
+          // Track the prediction ID
+          setActivePredictions(prev => {
+            const newMap = new Map(prev);
+            newMap.set(key, prediction.id);
+            return newMap;
+          });
+          
+          result = await pollForPrediction(prediction.id, settings.replicate_api_key, signal);
           if (result) {
             updateScene(currentScene.id, {
               generated_image: result,
@@ -112,8 +204,16 @@ export default function SceneViewerOverlay() {
           if (!currentScene.generated_image) {
             throw new Error('Please generate an image first');
           }
-          prediction = await generateVideo(videoPrompt, currentScene.generated_image, settings.replicate_api_key);
-          result = await pollForPrediction(prediction.id, settings.replicate_api_key);
+          prediction = await generateVideo(videoPrompt, currentScene.generated_image, settings.replicate_api_key, signal);
+          
+          // Track the prediction ID
+          setActivePredictions(prev => {
+            const newMap = new Map(prev);
+            newMap.set(key, prediction.id);
+            return newMap;
+          });
+          
+          result = await pollForPrediction(prediction.id, settings.replicate_api_key, signal);
           if (result) {
             updateScene(currentScene.id, {
               generated_video: result,
@@ -130,8 +230,16 @@ export default function SceneViewerOverlay() {
           if (!currentScene.generated_video) {
             throw new Error('Please generate a video first');
           }
-          prediction = await generateAudio(currentScene.generated_video, audioPrompt, settings.replicate_api_key);
-          result = await pollForPrediction(prediction.id, settings.replicate_api_key);
+          prediction = await generateAudio(currentScene.generated_video, audioPrompt, settings.replicate_api_key, signal);
+          
+          // Track the prediction ID
+          setActivePredictions(prev => {
+            const newMap = new Map(prev);
+            newMap.set(key, prediction.id);
+            return newMap;
+          });
+          
+          result = await pollForPrediction(prediction.id, settings.replicate_api_key, signal);
           if (result) {
             updateScene(currentScene.id, {
               generated_sound: result,
@@ -141,13 +249,25 @@ export default function SceneViewerOverlay() {
           }
           break;
       }
-            } catch (error) {
-          console.error(`Failed to generate ${type}:`, error);
-          playSounds.openOverlay(); // System NG for errors
-          alert(error instanceof Error ? error.message : `Failed to generate ${type}`);
-        } finally {
-          setIsGenerating(false);
-        }
+    } catch (error) {
+      console.error(`Failed to generate ${type}:`, error);
+      if (error instanceof Error && (error.message.includes('cancelled') || error.message.includes('aborted'))) {
+        // Don't show error dialog for user-initiated cancellations
+        playSounds.cancel();
+      } else {
+        playSounds.openOverlay(); // System NG for errors
+        alert(error instanceof Error ? error.message : `Failed to generate ${type}`);
+      }
+    } finally {
+      setSceneGenerationState(currentScene.id, type, false);
+      // Clean up prediction tracking
+      const key = `${currentScene.id}-${type}`;
+      setActivePredictions(prev => {
+        const newMap = new Map(prev);
+        newMap.delete(key);
+        return newMap;
+      });
+    }
   };
   
   // Render content based on selected tab
@@ -282,11 +402,10 @@ export default function SceneViewerOverlay() {
               
               <button
                 onClick={() => handleGenerate('image')}
-                onMouseEnter={() => !isGenerating && playSounds.hover()}
-                disabled={isGenerating}
-                className="w-full py-3 text-white hover:text-white/80 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-medium"
+                onMouseEnter={() => !getSceneGenerationState(currentScene.id, 'image') && playSounds.hover()}
+                className="w-full py-3 text-white hover:text-white/80 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
               >
-                {isGenerating ? (
+                {getSceneGenerationState(currentScene.id, 'image') ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
                     Generating...
@@ -337,11 +456,10 @@ export default function SceneViewerOverlay() {
               
               <button
                 onClick={() => handleGenerate('video')}
-                onMouseEnter={() => !isGenerating && playSounds.hover()}
-                disabled={isGenerating}
-                className="w-full py-3 text-white hover:text-white/80 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-medium"
+                onMouseEnter={() => !getSceneGenerationState(currentScene.id, 'video') && playSounds.hover()}
+                className="w-full py-3 text-white hover:text-white/80 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
               >
-                {isGenerating ? (
+                {getSceneGenerationState(currentScene.id, 'video') ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
                     Generating...
@@ -392,11 +510,10 @@ export default function SceneViewerOverlay() {
               
               <button
                 onClick={() => handleGenerate('audio')}
-                onMouseEnter={() => !isGenerating && playSounds.hover()}
-                disabled={isGenerating}
-                className="w-full py-3 text-white hover:text-white/80 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-medium"
+                onMouseEnter={() => !getSceneGenerationState(currentScene.id, 'audio') && playSounds.hover()}
+                className="w-full py-3 text-white hover:text-white/80 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
               >
-                {isGenerating ? (
+                {getSceneGenerationState(currentScene.id, 'audio') ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
                     Generating...
@@ -455,10 +572,32 @@ export default function SceneViewerOverlay() {
         </div>
       </div>
       
+
       {/* Main Content */}
       <div className="h-full flex pt-20 backdrop-clickable" onClick={handleBackdropClick}>
         {/* Left Panel - Scene Content */}
-        <div className={`${rightContent ? 'w-1/2' : 'w-full'} h-full backdrop-clickable`} onClick={handleBackdropClick}>
+        <div className={`${rightContent ? 'w-1/2' : 'w-full'} h-full backdrop-clickable relative`} onClick={handleBackdropClick}>
+          {/* Scene Navigation Arrows - positioned relative to content area */}
+          {currentSceneIndex > 0 && (
+            <button
+              onClick={() => navigateToScene('prev')}
+              onMouseEnter={() => playSounds.hover()}
+              className="absolute left-4 top-1/2 transform -translate-y-1/2 z-30 text-white/80 hover:text-white transition-colors"
+            >
+              <ChevronLeft className="w-12 h-12" strokeWidth={1} />
+            </button>
+          )}
+          
+          {currentSceneIndex < totalScenes - 1 && (
+            <button
+              onClick={() => navigateToScene('next')}
+              onMouseEnter={() => playSounds.hover()}
+              className="absolute right-4 top-1/2 transform -translate-y-1/2 z-30 text-white/80 hover:text-white transition-colors"
+            >
+              <ChevronRight className="w-12 h-12" strokeWidth={1} />
+            </button>
+          )}
+          
           {renderLeftContent()}
         </div>
         
@@ -469,6 +608,43 @@ export default function SceneViewerOverlay() {
           </div>
         )}
       </div>
+      
+      {/* Cancellation Dialog */}
+      {showCancelDialog && (
+        <div 
+          className="fixed inset-0 z-60 bg-black/40 backdrop-blur-lg backdrop-clickable flex items-center justify-center"
+          onClick={(e) => {
+            if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('backdrop-clickable')) {
+              setShowCancelDialog(null);
+            }
+          }}
+        >
+          <div className="backdrop-clickable p-6 max-w-md mx-4">
+            <h3 className="text-2xl font-light text-white mb-6">
+              stop generating {showCancelDialog}?
+            </h3>
+            <p className="text-white/70 mb-8 leading-relaxed">
+              this will cancel the current {showCancelDialog} generation for this scene.
+            </p>
+            <div className="flex gap-6 justify-end">
+              <button
+                onClick={() => setShowCancelDialog(null)}
+                onMouseEnter={() => playSounds.hover()}
+                className="text-sm text-white/70 hover:text-white transition-colors"
+              >
+                continue generating
+              </button>
+              <button
+                onClick={() => handleCancelGeneration(showCancelDialog)}
+                onMouseEnter={() => playSounds.hover()}
+                className="text-sm text-white hover:text-white/80 transition-colors"
+              >
+                stop generation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

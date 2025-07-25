@@ -138,14 +138,15 @@ type Prediction = {
 // Note: Replicate integration is now handled server-side via Next.js API routes
 
 // Image generation using Next.js API route
-export async function generateImage(prompt: string, apiKey: string): Promise<Prediction> {
+export async function generateImage(prompt: string, apiKey: string, signal?: AbortSignal): Promise<Prediction> {
   try {
     const response = await fetch('/api/generate/image', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ prompt, apiKey })
+      body: JSON.stringify({ prompt, apiKey }),
+      signal
     });
 
     if (!response.ok) {
@@ -168,20 +169,24 @@ export async function generateImage(prompt: string, apiKey: string): Promise<Pre
 
     return await response.json();
   } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Image generation was cancelled');
+    }
     console.error('Image generation error:', error);
     throw error;
   }
 }
 
 // Video generation using Next.js API route
-export async function generateVideo(prompt: string, imageUrl: string, apiKey: string): Promise<Prediction> {
+export async function generateVideo(prompt: string, imageUrl: string, apiKey: string, signal?: AbortSignal): Promise<Prediction> {
   try {
     const response = await fetch('/api/generate/video', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ prompt, imageUrl, apiKey })
+      body: JSON.stringify({ prompt, imageUrl, apiKey }),
+      signal
     });
 
     if (!response.ok) {
@@ -191,20 +196,24 @@ export async function generateVideo(prompt: string, imageUrl: string, apiKey: st
 
     return await response.json();
   } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Video generation was cancelled');
+    }
     console.error('Video generation error:', error);
     throw error;
   }
 }
 
 // Audio generation using Next.js API route
-export async function generateAudio(videoUrl: string, prompt: string, apiKey: string): Promise<Prediction> {
+export async function generateAudio(videoUrl: string, prompt: string, apiKey: string, signal?: AbortSignal): Promise<Prediction> {
   try {
     const response = await fetch('/api/generate/audio', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ prompt, videoUrl, apiKey })
+      body: JSON.stringify({ prompt, videoUrl, apiKey }),
+      signal
     });
 
     if (!response.ok) {
@@ -214,19 +223,27 @@ export async function generateAudio(videoUrl: string, prompt: string, apiKey: st
 
     return await response.json();
   } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Audio generation was cancelled');
+    }
     console.error('Audio generation error:', error);
     throw error;
   }
 }
 
 // Poll for prediction result
-export async function pollForPrediction(predictionId: string, apiKey: string): Promise<string> {
+export async function pollForPrediction(predictionId: string, apiKey: string, signal?: AbortSignal): Promise<string> {
   while (true) {
+    if (signal?.aborted) {
+      throw new Error('Polling was cancelled');
+    }
+    
     try {
       const response = await fetch(`/api/predictions/${predictionId}`, {
         headers: {
           'x-replicate-api-key': apiKey,
         },
+        signal
       });
 
       if (!response.ok) {
@@ -248,8 +265,20 @@ export async function pollForPrediction(predictionId: string, apiKey: string): P
         throw new Error(`Prediction failed with status: ${prediction.status}`);
       }
 
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Poll every 2 seconds
+      // Use AbortController for the timeout as well
+      await new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(resolve, 2000);
+        if (signal) {
+          signal.addEventListener('abort', () => {
+            clearTimeout(timeoutId);
+            reject(new Error('Polling was cancelled'));
+          });
+        }
+      });
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Polling was cancelled');
+      }
       console.error('Polling error:', error);
       throw error;
     }
