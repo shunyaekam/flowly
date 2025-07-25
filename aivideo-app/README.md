@@ -1,68 +1,81 @@
-# AI Video Generator
+# flowly
 
-An intelligent video creation tool that generates complete video storyboards with AI-generated images, videos, and audio.
+frictionless and flexible ai video generation.
 
-## Features
+live at [flowly.studio](https://flowly.studio)
 
-- **AI Storyboard Generation**: Create detailed video scripts using OpenAI
-- **Image Generation**: Generate cinematic images with Replicate's Seedream model
-- **Video Generation**: Create videos from images using Kling 2.1 Pro
-- **Audio Generation**: Add sound and music using Thinksound
-- **Project Management**: Save complete projects with all generated assets
-- **Interactive Storyboard**: Visual node-based storyboard editor
-- **Multiple Formats**: Support for conspiracy, educational, motivational, and storytelling formats
+## features
 
-## Setup
+**visual storyboard editor**  
+drag and connect scenes to define your video flow. reorder scenes by connecting edges between nodes.
 
-### 1. Install Dependencies
+**intelligent batch generation**  
+automatically detects what content is missing and generates in the correct order (images → videos → audio).
 
-```bash
-npm install
-```
+**real-time cancellation**  
+stop individual scenes or entire batch operations mid-generation via replicate api integration.
 
-### 2. API Keys Setup
+**adaptive scene navigation**  
+navigate between scenes following your visual flow arrangement, not just array order.
 
-**⚠️ IMPORTANT**: You need API keys to use the generation features.
+**persistent project state**  
+all scene data, positions, and generated content saved locally with export functionality.
 
-**Recommended Method**: Add API keys through the app's Settings modal:
-- **OpenAI API Key**: For advanced storyboard generation (optional - demo mode available)
-- **Replicate API Token**: For image/video/audio generation (required)
+**flexible prompt customization**  
+edit general instructions and mode-specific prompts for different video styles.
 
-**Alternative**: You can also set OpenAI key via environment variables:
+**model selection**  
+choose from multiple ai models for images, videos, and audio generation.
 
-```bash
-# Create .env.local file (optional)
-OPENAI_API_KEY=sk-your-openai-api-key-here
-```
+## installation
 
-See `ENV_SETUP.md` for detailed setup instructions.
+### for beginners
 
-### 3. Run the Development Server
+1. **install node.js**  
+   download and install from [nodejs.org](https://nodejs.org) (choose the lts version)
 
-```bash
-npm run dev
-```
+2. **download the code**  
+   click the green "code" button on this page, then "download zip". extract the folder.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser.
+3. **open terminal**  
+   - **windows**: press `win + r`, type `cmd`, press enter
+   - **mac**: press `cmd + space`, type `terminal`, press enter
+   - **linux**: press `ctrl + alt + t`
 
-## Usage
+4. **navigate to the folder**  
+   type `cd ` (with a space) then drag the extracted folder into the terminal window. press enter.
 
-1. **Create Storyboard**: Enter your video concept and select a format
-2. **Generate Content**: Use individual scene generation or batch "Generate All"
-3. **Edit & Refine**: Modify prompts and regenerate specific content
-4. **Save Project**: Download a ZIP file with all generated assets
+5. **install dependencies**  
+   ```
+   npm install
+   ```
 
-## Learn More
+6. **start the app**  
+   ```
+   npm run dev
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+7. **open your browser**  
+   go to `http://localhost:3000`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+8. **add your api keys**  
+   click "settings" and add your replicate api key (required) and openai api key (optional).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### api keys
 
-## Deploy on Vercel
+- **replicate**: sign up at [replicate.com](https://replicate.com), go to account settings, copy your api token
+- **openai**: sign up at [platform.openai.com](https://platform.openai.com), create an api key
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## experimental code
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+the `/Experimental Implementations` folder contains deprecated python scripts that were used for initial prototyping. these scripts tested various ai models and generation workflows before the main web application was built. they are no longer maintained but kept for reference.
+
+## tech stack
+
+- **next.js 15** - react framework
+- **typescript** - type safety
+- **zustand** - state management
+- **react flow** - visual node editor
+- **tailwind css** - styling
+- **replicate api** - ai model hosting
+- **openai api** - language models
