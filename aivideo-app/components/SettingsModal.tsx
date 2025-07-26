@@ -18,45 +18,37 @@ interface SettingsModalProps {
 }
 
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
-  const { settings, setSettings, selectedMode, setSelectedMode, availableModels, modelsLoading, loadAvailableModels } = useAppStore();
+  const { settings, setSettings, selectedMode, setSelectedMode } = useAppStore();
   const [localSettings, setLocalSettings] = useState<Settings>(settings);
   const [showExamplePrompts, setShowExamplePrompts] = useState(false);
   const [currentModePrompt, setCurrentModePrompt] = useState('');
   const [modelSelectorOpen, setModelSelectorOpen] = useState<'image' | 'video' | 'audio' | null>(null);
   const [dynamicExamples, setDynamicExamples] = useState<string>('');
 
-  // Function to fetch model examples
+  // Function to fetch model examples using direct Replicate API
   const fetchModelExamples = async (modelId: string): Promise<string[]> => {
     if (!settings.replicate_api_key || !modelId) return [];
     
     try {
-      const response = await fetch(`/api/models?search=${encodeURIComponent(modelId)}`, {
+      // Use a server-side helper to fetch model data
+      const response = await fetch('/api/model-examples', {
+        method: 'POST',
         headers: {
-          'x-replicate-token': settings.replicate_api_key,
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          modelId,
+          apiKey: settings.replicate_api_key
+        })
       });
 
       if (!response.ok) return [];
 
-      const data = await response.json();
-      const model = data.results?.find((m: any) => `${m.owner}/${m.name}` === modelId);
+      const examples = await response.json();
       
-      if (model?.default_example?.input) {
-        const input = model.default_example.input;
-        
-        // Extract relevant example prompts based on input structure
-        const examples = [];
-        if (input.prompt) examples.push(`Prompt: "${input.prompt}"`);
-        if (input.image_prompt) examples.push(`Image Prompt: "${input.image_prompt}"`);
-        if (input.video_prompt) examples.push(`Video Prompt: "${input.video_prompt}"`);
-        if (input.audio_prompt) examples.push(`Audio Prompt: "${input.audio_prompt}"`);
-        if (input.text) examples.push(`Text: "${input.text}"`);
-        
-        return examples;
-      }
+      // Format examples with prefixes for display
+      return examples.map((ex: string, i: number) => `${i + 1}. "${ex}"`);
       
-      return [];
     } catch (error) {
       console.error('Failed to fetch model examples:', error);
       return [];
@@ -122,12 +114,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         TOPIC_PROMPTS[selectedMode as keyof typeof TOPIC_PROMPTS]?.prompt || 
                         '';
       setCurrentModePrompt(modePrompt);
-      // Load available models
-      loadAvailableModels();
       // Load dynamic examples
       loadDynamicExamples();
     }
-  }, [isOpen, settings, selectedMode, loadAvailableModels]);
+  }, [isOpen, settings, selectedMode]);
 
   // Reload examples when models change
   useEffect(() => {
@@ -201,7 +191,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setCurrentModePrompt(modePrompt);
   };
 
-  const handleModelSelect = (modelId: string, customParams?: Record<string, any>) => {
+  const handleModelSelect = (modelId: string, customParams?: Record<string, unknown>) => {
     const type = modelSelectorOpen; // Get the type from which selector is open
     if (!type) return;
     
@@ -226,13 +216,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     const modelId = localSettings[`selected_${type}_model` as keyof Settings] as string;
     if (!modelId) return 'Select model...';
     
-    // Try to find in available models first
-    const model = availableModels[type]?.find(m => m.id === modelId);
-    if (model) {
-      return `${model.displayName} (${model.metadata.runCount.toLocaleString()} runs)`;
-    }
-    
-    // Fallback to showing the ID
+    // Show just the model name part
     return modelId.split('/').pop() || modelId;
   };
   

@@ -1,6 +1,6 @@
 import Replicate from "replicate";
 import { NextRequest, NextResponse } from "next/server";
-import { modelRegistry } from "@/lib/model-registry/registry";
+import { getModelConfig, processModelParameters } from "@/lib/replicate-direct";
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,76 +27,47 @@ export async function POST(request: NextRequest) {
       auth: apiKey,
     });
 
-    // Try to get model config from registry, if not found, fetch directly from Replicate
-    let modelConfig = null;
-    if (modelId) {
-      modelConfig = await modelRegistry.getModel(modelId);
-      
-      // If not in registry, try fetching from Replicate directly
-      if (!modelConfig) {
-        console.log(`Model ${modelId} not in registry, fetching from Replicate...`);
-        try {
-          const replicateResponse = await fetch(`https://api.replicate.com/v1/models`, {
-            method: 'QUERY',
-            headers: {
-              'Authorization': `Token ${apiKey}`,
-              'Content-Type': 'text/plain'
-            },
-            body: modelId
-          });
-          
-          if (replicateResponse.ok) {
-            const data = await replicateResponse.json();
-            const model = data.results?.find((m: any) => `${m.owner}/${m.name}` === modelId);
-            
-            if (model && model.latest_version?.id) {
-              console.log(`Found model ${modelId} with version ${model.latest_version.id}`);
-              // Create a simple config for this model
-              modelConfig = {
-                endpoint: modelId,
-                version: model.latest_version.id,
-                defaultParams: {},
-                inputMapping: { prompt: 'prompt' }
-              };
-            }
-          }
-        } catch (error) {
-          console.error('Failed to fetch model from Replicate:', error);
-        }
-      }
-    }
-
-    if (!modelConfig) {
+    // Get model config directly from Replicate
+    if (!modelId) {
       return NextResponse.json(
-        { error: 'Model not found' },
-        { status: 404 }
+        { error: 'Model ID required' },
+        { status: 400 }
       );
     }
 
-    // Ensure we have a proper version hash
-    if (!modelConfig.version) {
+    let modelConfig;
+    try {
+      modelConfig = await getModelConfig(modelId, apiKey);
+    } catch (error) {
+      console.error('Failed to fetch model from Replicate:', error);
       return NextResponse.json(
-        { error: `Model ${modelConfig.endpoint} missing version hash` },
-        { status: 400 }
+        { error: error instanceof Error ? error.message : 'Model not found' },
+        { status: 404 }
       );
     }
     
     // Build proper endpoint with version
-    const endpoint = modelConfig.endpoint.includes(':') 
-      ? modelConfig.endpoint 
-      : `${modelConfig.endpoint}:${modelConfig.version}`;
+    const endpoint = `${modelConfig.endpoint}:${modelConfig.version}`;
     
-    let input = {
-      ...modelConfig.defaultParams,
-      [modelConfig.inputMapping.prompt || 'prompt']: prompt
+    // Prepare base parameters
+    const baseParams = {
+      [modelConfig.inputMapping.prompt]: prompt
     };
 
-    // Apply custom parameters if provided
-    if (customParams && typeof customParams === 'object') {
-      console.log('Applying custom parameters:', customParams);
-      input = { ...input, ...customParams };
-      // Ensure prompt is still set correctly
-      input[modelConfig.inputMapping.prompt || 'prompt'] = prompt;
+    // Merge with custom parameters and process types
+    const allParams = { ...baseParams, ...(customParams || {}) };
+    
+    // Process and validate parameters according to schema
+    let input;
+    try {
+      input = processModelParameters(allParams, modelConfig);
+      console.log('Processed parameters:', input);
+    } catch (error) {
+      console.error('Parameter processing error:', error);
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Parameter validation failed' },
+        { status: 400 }
+      );
     }
 
     console.log(`Starting Replicate model run with ${endpoint}...`);

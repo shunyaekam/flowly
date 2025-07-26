@@ -3,13 +3,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { X, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAppStore, Scene } from '@/lib/store';
+import { playSounds } from '@/lib/sounds';
 
 interface ModelSelectorProps {
   isOpen: boolean;
   onClose: () => void;
   type: 'image' | 'video' | 'audio';
   sceneId?: string; // If provided, selects for specific scene; otherwise for global settings
-  onModelSelect: (modelId: string, customParams?: Record<string, any>) => void;
+  onModelSelect: (modelId: string, customParams?: Record<string, unknown>) => void;
 }
 
 interface ReplicateModel {
@@ -22,7 +23,7 @@ interface ReplicateModel {
   paper_url?: string;
   license_url?: string;
   default_example?: {
-    input: Record<string, any>;
+    input: Record<string, unknown>;
     output: string | string[];
   };
   latest_version?: {
@@ -32,7 +33,7 @@ interface ReplicateModel {
       components?: {
         schemas?: {
           Input?: {
-            properties?: Record<string, any>;
+            properties?: Record<string, unknown>;
           };
           Output?: {
             type?: string;
@@ -54,7 +55,7 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [showParameters, setShowParameters] = useState(false);
-  const [editableParams, setEditableParams] = useState<Record<string, any>>({});
+  const [editableParams, setEditableParams] = useState<Record<string, unknown>>({});
 
   // Get currently selected model ID
   const getCurrentModelId = () => {
@@ -162,13 +163,26 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
         return category === type && hasPromptInput;
       });
 
-      setFilteredModels(categoryModels);
+      // Sort by popularity (run_count) descending, then by name
+      const sortedModels = categoryModels.sort((a: ReplicateModel, b: ReplicateModel) => {
+        const aRunCount = a.run_count || 0;
+        const bRunCount = b.run_count || 0;
+        
+        if (aRunCount !== bRunCount) {
+          return bRunCount - aRunCount; // Higher run count first
+        }
+        
+        // If run counts are equal, sort by name alphabetically
+        return a.name.localeCompare(b.name);
+      });
+
+      setFilteredModels(sortedModels);
       console.log(`Found ${categoryModels.length} ${type} models for search: ${searchQuery}`);
       
     } catch (error) {
       console.error('Failed to search models:', error);
       // Fall back to client-side filtering of loaded models
-      setFilteredModels(models.filter(model => {
+      const filteredResults = models.filter((model: ReplicateModel) => {
         const modelId = `${model.owner}/${model.name}`;
         const description = model.description?.toLowerCase() || '';
         const name = model.name.toLowerCase();
@@ -179,7 +193,21 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
                name.includes(searchLower) ||
                owner.includes(searchLower) ||
                description.includes(searchLower);
-      }));
+      });
+
+      // Sort by popularity
+      const sortedResults = filteredResults.sort((a: ReplicateModel, b: ReplicateModel) => {
+        const aRunCount = a.run_count || 0;
+        const bRunCount = b.run_count || 0;
+        
+        if (aRunCount !== bRunCount) {
+          return bRunCount - aRunCount; // Higher run count first
+        }
+        
+        return a.name.localeCompare(b.name);
+      });
+
+      setFilteredModels(sortedResults);
     } finally {
       setLoading(false);
     }
@@ -224,12 +252,35 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
 
       if (loadMore) {
         setModels(prev => {
-          const existingIds = new Set(prev.map(m => `${m.owner}/${m.name}`));
-          const newUniqueModels = categoryModels.filter(m => !existingIds.has(`${m.owner}/${m.name}`));
-          return [...prev, ...newUniqueModels];
+          const existingIds = new Set(prev.map((m: ReplicateModel) => `${m.owner}/${m.name}`));
+          const newUniqueModels = categoryModels.filter((m: ReplicateModel) => !existingIds.has(`${m.owner}/${m.name}`));
+          const allModels = [...prev, ...newUniqueModels];
+          
+          // Sort by popularity after adding new models
+          return allModels.sort((a: ReplicateModel, b: ReplicateModel) => {
+            const aRunCount = a.run_count || 0;
+            const bRunCount = b.run_count || 0;
+            
+            if (aRunCount !== bRunCount) {
+              return bRunCount - aRunCount; // Higher run count first
+            }
+            
+            return a.name.localeCompare(b.name);
+          });
         });
       } else {
-        setModels(categoryModels);
+        // Sort initial models by popularity
+        const sortedModels = categoryModels.sort((a: ReplicateModel, b: ReplicateModel) => {
+          const aRunCount = a.run_count || 0;
+          const bRunCount = b.run_count || 0;
+          
+          if (aRunCount !== bRunCount) {
+            return bRunCount - aRunCount; // Higher run count first
+          }
+          
+          return a.name.localeCompare(b.name);
+        });
+        setModels(sortedModels);
       }
 
       console.log(`Fetched ${categoryModels.length} ${type} models`);
@@ -276,7 +327,7 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
       const data = await response.json();
       console.log('Search response data:', data);
       
-      const currentModel = data.results?.find((m: any) => `${m.owner}/${m.name}` === currentModelId);
+      const currentModel = data.results?.find((m: ReplicateModel) => `${m.owner}/${m.name}` === currentModelId);
       
       if (currentModel) {
         const category = categorizeModel(currentModel);
@@ -285,7 +336,7 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
         if (category === type) {
           console.log(`Adding current model ${currentModelId} to models list`);
           setModels(prev => {
-            const existingIds = new Set(prev.map(m => `${m.owner}/${m.name}`));
+            const existingIds = new Set(prev.map((m: ReplicateModel) => `${m.owner}/${m.name}`));
             if (!existingIds.has(currentModelId)) {
               return [currentModel, ...prev];
             }
@@ -326,8 +377,18 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
     if (!settings.replicate_api_key) return;
 
     if (searchTerm.trim() === '') {
-      // If search is empty, show all loaded models
-      setFilteredModels(models);
+      // If search is empty, show all loaded models sorted by popularity
+      const sortedModels = [...models].sort((a: ReplicateModel, b: ReplicateModel) => {
+        const aRunCount = a.run_count || 0;
+        const bRunCount = b.run_count || 0;
+        
+        if (aRunCount !== bRunCount) {
+          return bRunCount - aRunCount; // Higher run count first
+        }
+        
+        return a.name.localeCompare(b.name);
+      });
+      setFilteredModels(sortedModels);
       return;
     }
 
@@ -364,29 +425,30 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
         setSelectedModel(currentModel);
         
         // Load existing parameters from settings/scene
-        let existingParams: Record<string, any> = {};
+        let existingParams: Record<string, unknown> = {};
         
         if (sceneId) {
           // Load scene-specific parameters
           const scene = storyboardData?.scenes.find(s => s.id === sceneId);
           const paramsKey = `${type}_model_params` as keyof Scene;
-          existingParams = scene?.[paramsKey] as Record<string, any> || {};
+          existingParams = scene?.[paramsKey] as Record<string, unknown> || {};
         } else {
           // Load global parameters
           const paramsKey = `${type}_model_params` as keyof typeof settings;
-          existingParams = settings[paramsKey] as Record<string, any> || {};
+          existingParams = settings[paramsKey] as Record<string, unknown> || {};
         }
         
         // Initialize parameters with existing values or defaults
         const schema = currentModel.latest_version?.openapi_schema;
         const inputProps = schema?.components?.schemas?.Input?.properties || {};
-        const initialParams: Record<string, any> = {};
+        const initialParams: Record<string, unknown> = {};
         
-        Object.entries(inputProps).forEach(([key, prop]: [string, any]) => {
+        Object.entries(inputProps).forEach(([key, prop]: [string, unknown]) => {
+          const propObj = prop as Record<string, unknown>;
           if (existingParams[key] !== undefined) {
             initialParams[key] = existingParams[key];
-          } else if (prop.default !== undefined) {
-            initialParams[key] = prop.default;
+          } else if (propObj.default !== undefined) {
+            initialParams[key] = propObj.default;
           }
         });
         
@@ -402,11 +464,12 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
     // Initialize editable parameters with defaults
     const schema = model.latest_version?.openapi_schema;
     const inputProps = schema?.components?.schemas?.Input?.properties || {};
-    const initialParams: Record<string, any> = {};
+    const initialParams: Record<string, unknown> = {};
     
-    Object.entries(inputProps).forEach(([key, prop]: [string, any]) => {
-      if (prop.default !== undefined) {
-        initialParams[key] = prop.default;
+    Object.entries(inputProps).forEach(([key, prop]: [string, unknown]) => {
+      const propObj = prop as Record<string, unknown>;
+      if (propObj.default !== undefined) {
+        initialParams[key] = propObj.default;
       }
     });
     
@@ -420,6 +483,7 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
       console.log('Selecting model:', modelId, 'with params:', editableParams);
       // Pass model ID and custom parameters
       onModelSelect(modelId, editableParams);
+      playSounds.ok(); // Success sound
       onClose();
     }
   };
@@ -439,6 +503,7 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
   }, [hasMore, loading]);
 
   const handleClose = () => {
+    playSounds.cancel();
     onClose();
   };
 
@@ -455,6 +520,7 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
             </h2>
             <button
               onClick={handleClose}
+              onMouseEnter={() => playSounds.hover()}
               className="text-white/60 hover:text-white transition-colors"
             >
               <X className="w-6 h-6" />
@@ -496,6 +562,7 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
                   <div
                     key={`${model.owner}/${model.name}`}
                     onClick={() => handleModelSelect(model)}
+                    onMouseEnter={() => playSounds.hover()}
                     className={`p-4 rounded cursor-pointer transition-colors ${
                       selectedModel?.name === model.name && selectedModel?.owner === model.owner
                         ? 'bg-transparent border border-white/20'
@@ -526,6 +593,7 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
               {hasMore && !loading && settings.replicate_api_key && (
                 <button
                   onClick={loadMore}
+                  onMouseEnter={() => playSounds.hover()}
                   className="w-full py-3 text-white/60 hover:text-white transition-colors text-sm"
                 >
                   load more models...
@@ -605,22 +673,22 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
                   
                   {showParameters && selectedModel.latest_version?.openapi_schema?.components?.schemas?.Input?.properties && (
                     <div className="space-y-4 max-h-96 overflow-y-auto">
-                      {Object.entries(selectedModel.latest_version.openapi_schema.components.schemas.Input.properties).map(([key, prop]: [string, any]) => (
+                      {Object.entries(selectedModel.latest_version.openapi_schema.components.schemas.Input.properties).map(([key, prop]: [string, unknown]) => (
                         <div key={key} className="bg-transparent p-4">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-white text-sm font-mono">{key}</span>
-                            <span className="text-white/50 text-xs">{prop.type}</span>
+                            <span className="text-white/50 text-xs">{(prop as Record<string, unknown>).type as string}</span>
                           </div>
-                          {prop.description && (
-                            <p className="text-white/70 text-xs mb-3">{prop.description}</p>
-                          )}
+                          {(prop as Record<string, unknown>).description && typeof (prop as Record<string, unknown>).description === 'string' ? (
+                            <p className="text-white/70 text-xs mb-3">{String((prop as Record<string, unknown>).description)}</p>
+                          ) : null}
                           
                           {/* Editable Input */}
                           {key !== 'prompt' && ( // Skip prompt as it's handled separately
                             <div>
-                              {prop.type === 'boolean' ? (
+                              {(prop as Record<string, unknown>).type === 'boolean' ? (
                                 <select
-                                  value={editableParams[key] !== undefined ? String(editableParams[key]) : String(prop.default || false)}
+                                  value={editableParams[key] !== undefined ? String(editableParams[key]) : String((prop as Record<string, unknown>).default || false)}
                                   onChange={(e) => setEditableParams(prev => ({
                                     ...prev,
                                     [key]: e.target.value === 'true'
@@ -631,22 +699,22 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
                                   <option value="true" className="bg-gray-800">true</option>
                                   <option value="false" className="bg-gray-800">false</option>
                                 </select>
-                              ) : prop.type === 'number' || prop.type === 'integer' ? (
+                              ) : (prop as Record<string, unknown>).type === 'number' || (prop as Record<string, unknown>).type === 'integer' ? (
                                 <input
                                   type="number"
-                                  value={editableParams[key] !== undefined ? editableParams[key] : (prop.default || '')}
+                                  value={editableParams[key] !== undefined ? String(editableParams[key]) : String((prop as Record<string, unknown>).default || '')}
                                   onChange={(e) => setEditableParams(prev => ({
                                     ...prev,
-                                    [key]: prop.type === 'integer' ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0
+                                    [key]: (prop as Record<string, unknown>).type === 'integer' ? parseInt(e.target.value) || 0 : parseFloat(e.target.value) || 0
                                   }))}
                                   onClick={(e) => e.stopPropagation()}
                                   className="w-full px-2 py-1 bg-white/10 border border-white/20 text-white text-sm rounded focus:outline-none focus:border-white/40"
-                                  step={prop.type === 'integer' ? '1' : '0.1'}
+                                  step={(prop as Record<string, unknown>).type === 'integer' ? '1' : '0.1'}
                                 />
                               ) : (
                                 <input
                                   type="text"
-                                  value={editableParams[key] !== undefined ? editableParams[key] : (prop.default || '')}
+                                  value={editableParams[key] !== undefined ? String(editableParams[key]) : String((prop as Record<string, unknown>).default || '')}
                                   onChange={(e) => setEditableParams(prev => ({
                                     ...prev,
                                     [key]: e.target.value
@@ -656,7 +724,7 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
                                 />
                               )}
                               <p className="text-white/40 text-xs mt-1">
-                                default: {String(prop.default)}
+                                default: {String((prop as Record<string, unknown>).default)}
                               </p>
                             </div>
                           )}
@@ -670,6 +738,7 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
               {/* Select Button - Fixed at bottom */}
               <button
                 onClick={handleConfirmSelection}
+                onMouseEnter={() => playSounds.hover()}
                 className="w-full py-3 bg-transparent text-white font-light hover:text-white/80 transition-colors"
               >
                 select model

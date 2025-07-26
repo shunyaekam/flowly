@@ -1,6 +1,6 @@
 import Replicate from "replicate";
 import { NextRequest, NextResponse } from "next/server";
-import { modelRegistry } from "@/lib/model-registry/registry";
+import { getModelConfig, processModelParameters } from "@/lib/replicate-direct";
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,54 +27,52 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get model config from registry if modelId is provided, otherwise fallback to default
-    let modelConfig = null;
-    if (modelId) {
-      modelConfig = await modelRegistry.getModel(modelId);
-      if (!modelConfig) {
-        return NextResponse.json(
-          { error: 'Model not found' },
-          { status: 404 }
-        );
-      }
-    }
-
     const replicate = new Replicate({
       auth: apiKey,
     });
 
-    if (!modelConfig) {
+    // Get model config directly from Replicate
+    if (!modelId) {
       return NextResponse.json(
-        { error: 'Model configuration required' },
+        { error: 'Model ID required' },
         { status: 400 }
       );
     }
 
-    // Ensure we have a proper version hash
-    if (!modelConfig.version) {
+    let modelConfig;
+    try {
+      modelConfig = await getModelConfig(modelId, apiKey);
+    } catch (error) {
+      console.error('Failed to fetch model from Replicate:', error);
       return NextResponse.json(
-        { error: `Model ${modelConfig.endpoint} missing version hash` },
-        { status: 400 }
+        { error: error instanceof Error ? error.message : 'Model not found' },
+        { status: 404 }
       );
     }
     
     // Build proper endpoint with version
-    const endpoint = modelConfig.endpoint.includes(':') 
-      ? modelConfig.endpoint 
-      : `${modelConfig.endpoint}:${modelConfig.version}`;
-    let input = {
-      ...modelConfig.defaultParams,
-      [modelConfig.inputMapping.prompt || 'prompt']: prompt,
-      [modelConfig.inputMapping.imageUrl || 'start_image']: imageUrl
+    const endpoint = `${modelConfig.endpoint}:${modelConfig.version}`;
+    
+    // Prepare base parameters
+    const baseParams = {
+      [modelConfig.inputMapping.prompt]: prompt,
+      [modelConfig.inputMapping.imageUrl]: imageUrl
     };
 
-    // Apply custom parameters if provided
-    if (customParams && typeof customParams === 'object') {
-      console.log('Applying custom parameters:', customParams);
-      input = { ...input, ...customParams };
-      // Ensure prompt and imageUrl are still set correctly
-      input[modelConfig.inputMapping.prompt || 'prompt'] = prompt;
-      input[modelConfig.inputMapping.imageUrl || 'start_image'] = imageUrl;
+    // Merge with custom parameters and process types
+    const allParams = { ...baseParams, ...(customParams || {}) };
+    
+    // Process and validate parameters according to schema
+    let input;
+    try {
+      input = processModelParameters(allParams, modelConfig);
+      console.log('Processed parameters:', input);
+    } catch (error) {
+      console.error('Parameter processing error:', error);
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Parameter validation failed' },
+        { status: 400 }
+      );
     }
 
     console.log(`Starting video generation with ${endpoint}...`);

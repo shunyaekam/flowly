@@ -24,91 +24,35 @@ export function safeFilename(s: string): string {
   return s.replace(/[^\w\-_\. ]/g, '_').slice(0, 50);
 }
 
-// Function to fetch model examples dynamically
+// Function to fetch model examples using server-side API route
 async function fetchModelExamples(modelId: string, replicateApiKey: string): Promise<string[]> {
   if (!replicateApiKey || !modelId) {
     console.log('Missing API key or model ID for fetchModelExamples');
     return [];
   }
   
-  console.log(`Fetching examples for model: ${modelId}`);
-  
   try {
-    // First try to get the specific model by exact ID from our proxy route
-    let response = await fetch(`/api/models?search=${encodeURIComponent(modelId)}`, {
+    // Use the server-side API route instead of direct Replicate call
+    const response = await fetch('/api/model-examples', {
+      method: 'POST',
       headers: {
-        'x-replicate-token': replicateApiKey,
-        'Content-Type': 'application/json'
-      }
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        modelId,
+        apiKey: replicateApiKey
+      })
     });
 
     if (!response.ok) {
-      console.error(`API response not ok: ${response.status} ${response.statusText}`);
+      console.error(`Failed to fetch examples for ${modelId}: ${response.status}`);
       return [];
     }
 
-    const data = await response.json();
-    console.log('API response data:', data);
+    const examples = await response.json();
+    console.log(`Found ${examples.length} examples for ${modelId}:`, examples);
     
-    const model = data.results?.find((m: any) => `${m.owner}/${m.name}` === modelId);
-    
-    if (!model) {
-      console.log(`Model ${modelId} not found in search results`);
-      return [];
-    }
-
-    console.log('Found model:', model.name, 'by', model.owner);
-
-    const examples = [];
-    
-    // Get examples from multiple sources
-    if (model.default_example?.input) {
-      const input = model.default_example.input;
-      console.log('Found default_example.input:', input);
-      
-      // Extract all available prompts
-      if (input.prompt) examples.push(input.prompt);
-      if (input.image_prompt) examples.push(input.image_prompt);
-      if (input.video_prompt) examples.push(input.video_prompt);
-      if (input.audio_prompt) examples.push(input.audio_prompt);
-      if (input.text) examples.push(input.text);
-      if (input.description) examples.push(input.description);
-      if (input.input_text) examples.push(input.input_text);
-      if (input.query) examples.push(input.query);
-    } else {
-      console.log('No default_example.input found');
-    }
-
-    // Also check if there are example predictions or versions with examples
-    if (model.latest_version?.openapi_schema?.components?.schemas?.Input?.properties) {
-      const props = model.latest_version.openapi_schema.components.schemas.Input.properties;
-      console.log('Found schema properties:', Object.keys(props));
-      
-      // Look for examples in schema properties
-      Object.entries(props).forEach(([key, prop]: [string, any]) => {
-        if (prop.example && typeof prop.example === 'string' && prop.example.length > 10) {
-          console.log(`Found example in ${key}:`, prop.example.substring(0, 50) + '...');
-          examples.push(prop.example);
-        }
-        if (prop.examples && Array.isArray(prop.examples)) {
-          prop.examples.forEach((ex: any) => {
-            if (typeof ex === 'string' && ex.length > 10) {
-              console.log(`Found example in ${key}.examples:`, ex.substring(0, 50) + '...');
-              examples.push(ex);
-            }
-          });
-        }
-      });
-    } else {
-      console.log('No schema properties found');
-    }
-    
-    console.log(`Found ${examples.length} examples for ${modelId}`);
-    
-    // Remove duplicates and return up to 5 examples
-    const uniqueExamples = [...new Set(examples)].slice(0, 5);
-    console.log('Returning examples:', uniqueExamples.map(ex => ex.substring(0, 100) + '...'));
-    return uniqueExamples;
+    return examples;
     
   } catch (error) {
     console.error(`Failed to fetch model examples for ${modelId}:`, error);
@@ -155,6 +99,13 @@ export async function generateStoryboard(
   let videoExamples = MODEL_EXAMPLES.video_examples;
   let soundExamples = MODEL_EXAMPLES.sound_examples;
 
+  console.log('Storyboard generation - Model selection:', {
+    selectedImageModel,
+    selectedVideoModel, 
+    selectedAudioModel,
+    hasReplicateKey: !!replicateApiKey
+  });
+
   if (replicateApiKey) {
     try {
       const [dynamicImageExamples, dynamicVideoExamples, dynamicAudioExamples] = await Promise.all([
@@ -163,13 +114,30 @@ export async function generateStoryboard(
         selectedAudioModel ? fetchModelExamples(selectedAudioModel, replicateApiKey) : Promise.resolve([])
       ]);
 
+      console.log('Dynamic examples fetched:', {
+        imageCount: dynamicImageExamples.length,
+        videoCount: dynamicVideoExamples.length,
+        audioCount: dynamicAudioExamples.length,
+        imageExamples: dynamicImageExamples.slice(0, 1), // Show first example
+        videoExamples: dynamicVideoExamples.slice(0, 1),
+        audioExamples: dynamicAudioExamples.slice(0, 1)
+      });
+
       // Use dynamic examples if available, fall back to static ones
       if (dynamicImageExamples.length > 0) imageExamples = dynamicImageExamples;
       if (dynamicVideoExamples.length > 0) videoExamples = dynamicVideoExamples;
       if (dynamicAudioExamples.length > 0) soundExamples = dynamicAudioExamples;
+      
+      console.log('Final examples being used:', {
+        imageExamplesUsed: imageExamples === MODEL_EXAMPLES.image_examples ? 'static' : 'dynamic',
+        videoExamplesUsed: videoExamples === MODEL_EXAMPLES.video_examples ? 'static' : 'dynamic',
+        soundExamplesUsed: soundExamples === MODEL_EXAMPLES.sound_examples ? 'static' : 'dynamic'
+      });
     } catch (error) {
       console.error('Failed to fetch dynamic model examples, using static ones:', error);
     }
+  } else {
+    console.log('No Replicate API key provided, using static examples');
   }
 
   // Build comprehensive system prompt
@@ -256,7 +224,7 @@ type Prediction = {
 // Note: Replicate integration is now handled server-side via Next.js API routes
 
 // Image generation using Next.js API route
-export async function generateImage(prompt: string, apiKey: string, modelId?: string, signal?: AbortSignal, customParams?: Record<string, any>): Promise<Prediction> {
+export async function generateImage(prompt: string, apiKey: string, modelId?: string, signal?: AbortSignal, customParams?: Record<string, unknown>): Promise<Prediction> {
   try {
     const response = await fetch('/api/generate/image', {
       method: 'POST',
@@ -296,7 +264,7 @@ export async function generateImage(prompt: string, apiKey: string, modelId?: st
 }
 
 // Video generation using Next.js API route
-export async function generateVideo(prompt: string, imageUrl: string, apiKey: string, modelId?: string, signal?: AbortSignal, customParams?: Record<string, any>): Promise<Prediction> {
+export async function generateVideo(prompt: string, imageUrl: string, apiKey: string, modelId?: string, signal?: AbortSignal, customParams?: Record<string, unknown>): Promise<Prediction> {
   try {
     const response = await fetch('/api/generate/video', {
       method: 'POST',
@@ -323,7 +291,7 @@ export async function generateVideo(prompt: string, imageUrl: string, apiKey: st
 }
 
 // Audio generation using Next.js API route
-export async function generateAudio(videoUrl: string, prompt: string, apiKey: string, modelId?: string, signal?: AbortSignal, customParams?: Record<string, any>): Promise<Prediction> {
+export async function generateAudio(videoUrl: string, prompt: string, apiKey: string, modelId?: string, signal?: AbortSignal, customParams?: Record<string, unknown>): Promise<Prediction> {
   try {
     const response = await fetch('/api/generate/audio', {
       method: 'POST',

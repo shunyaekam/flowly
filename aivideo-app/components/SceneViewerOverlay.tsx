@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAppStore } from '@/lib/store';
+import { useAppStore, Scene } from '@/lib/store';
 import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { generateImage, generateVideo, generateAudio, pollForPrediction } from '@/lib/api';
 import { playSounds } from '@/lib/sounds';
@@ -21,9 +21,6 @@ export default function SceneViewerOverlay() {
     cancelGeneration,
     generationCancellation,
     visualSceneOrder,
-    availableModels,
-    modelsLoading,
-    loadAvailableModels
   } = useAppStore();
   
   // Find the current scene being edited
@@ -60,10 +57,6 @@ export default function SceneViewerOverlay() {
     }
   }, [currentScene, settings.selected_image_model, settings.selected_video_model, settings.selected_audio_model]);
 
-  // Load available models when component mounts
-  useEffect(() => {
-    loadAvailableModels();
-  }, [loadAvailableModels]);
   
   // Handle closing the overlay
   const handleClose = () => {
@@ -93,7 +86,7 @@ export default function SceneViewerOverlay() {
   }, []);
 
   // Model selection handlers
-  const handleModelSelect = (modelId: string, customParams?: Record<string, any>) => {
+  const handleModelSelect = (modelId: string, customParams?: Record<string, unknown>) => {
     const type = modelSelectorOpen; // Get the type from which selector is open
     if (!type) return;
     
@@ -146,16 +139,9 @@ export default function SceneViewerOverlay() {
     
     if (!modelId) return 'Select model...';
     
-    // Try to find in available models first
-    const model = availableModels[type]?.find(m => m.id === modelId);
-    if (model) {
-      const displayName = `${model.displayName} (${model.metadata.runCount.toLocaleString()} runs)`;
-      return isSceneSpecific ? `${displayName} *` : displayName; // * indicates scene-specific
-    }
-    
-    // Fallback to showing the ID
-    const fallbackName = modelId.split('/').pop() || modelId;
-    return isSceneSpecific ? `${fallbackName} *` : fallbackName;
+    // Show just the model name part
+    const displayName = modelId.split('/').pop() || modelId;
+    return isSceneSpecific ? `${displayName} *` : displayName; // * indicates scene-specific
   };
   
   // Navigation functions

@@ -1,6 +1,4 @@
 import { create } from 'zustand';
-import { modelRegistry } from './model-registry/registry';
-import { ModelConfig } from './model-registry/types';
 
 // Types
 export interface Scene {
@@ -21,9 +19,9 @@ export interface Scene {
   selected_video_model?: string;
   selected_audio_model?: string;
   // Per-scene model parameters (optional - falls back to global settings)
-  image_model_params?: Record<string, any>;
-  video_model_params?: Record<string, any>;
-  audio_model_params?: Record<string, any>;
+  image_model_params?: Record<string, unknown>;
+  video_model_params?: Record<string, unknown>;
+  audio_model_params?: Record<string, unknown>;
 }
 
 export interface StoryboardData {
@@ -42,9 +40,9 @@ export interface Settings {
   selected_video_model: string;
   selected_audio_model: string;
   // Global model parameters
-  image_model_params?: Record<string, any>;
-  video_model_params?: Record<string, any>;
-  audio_model_params?: Record<string, any>;
+  image_model_params?: Record<string, unknown>;
+  video_model_params?: Record<string, unknown>;
+  audio_model_params?: Record<string, unknown>;
 }
 
 export interface AppState {
@@ -97,28 +95,9 @@ export interface AppState {
   resetStoryboard: () => void;
   loadInitialSettings: () => void;
 
-  // Dynamic model registry
-  availableModels: {
-    image: ModelConfig[];
-    video: ModelConfig[];
-    audio: ModelConfig[];
-  };
-  modelsLoading: boolean;
-  loadAvailableModels: () => Promise<void>;
 }
 
-// Helper functions to get models from registry
-export const getImageModels = async () => {
-  return await modelRegistry.getModels('image');
-};
 
-export const getVideoModels = async () => {
-  return await modelRegistry.getModels('video');
-};
-
-export const getAudioModels = async () => {
-  return await modelRegistry.getModels('audio');
-};
 
 // Available models
 export const storyboardModels = [
@@ -430,34 +409,4 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
   },
 
-  // Dynamic model registry
-  availableModels: {
-    image: [],
-    video: [],
-    audio: []
-  },
-  modelsLoading: false,
-
-  loadAvailableModels: async () => {
-    set({ modelsLoading: true });
-    try {
-      const [imageModels, videoModels, audioModels] = await Promise.all([
-        modelRegistry.getModels('image', 20), // Limit to top 20
-        modelRegistry.getModels('video', 20),
-        modelRegistry.getModels('audio', 20)
-      ]);
-
-      set({
-        availableModels: {
-          image: imageModels,
-          video: videoModels,
-          audio: audioModels
-        },
-        modelsLoading: false
-      });
-    } catch (error) {
-      console.error('Failed to load models:', error);
-      set({ modelsLoading: false });
-    }
-  }
 })); 
