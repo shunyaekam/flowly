@@ -1,14 +1,16 @@
 import Replicate from "replicate";
 import { NextRequest, NextResponse } from "next/server";
+import { getModelConfig, processModelParameters } from "@/lib/replicate-direct";
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt, videoUrl, apiKey } = await request.json();
+    const { prompt, videoUrl, apiKey, modelId, customParams } = await request.json();
 
     console.log('Audio generation request:', { 
       prompt: prompt?.substring(0, 100) + '...', 
       videoUrl: videoUrl?.substring(0, 100) + '...',
-      hasApiKey: !!apiKey 
+      hasApiKey: !!apiKey,
+      modelId
     });
 
     if (!prompt || !videoUrl) {
@@ -29,17 +31,53 @@ export async function POST(request: NextRequest) {
       auth: apiKey,
     });
 
-    const input = {
-      caption: prompt,
-      cfg: 5,
-      num_inference_steps: 24,
-      video: videoUrl,
-      cot: prompt,
+    // Get model config directly from Replicate
+    if (!modelId) {
+      return NextResponse.json(
+        { error: 'Model ID required' },
+        { status: 400 }
+      );
+    }
+
+    let modelConfig;
+    try {
+      modelConfig = await getModelConfig(modelId, apiKey);
+    } catch (error) {
+      console.error('Failed to fetch model from Replicate:', error);
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Model not found' },
+        { status: 404 }
+      );
+    }
+    
+    // Build proper endpoint with version
+    const endpoint = `${modelConfig.endpoint}:${modelConfig.version}`;
+    
+    // Prepare base parameters
+    const baseParams = {
+      [modelConfig.inputMapping.prompt]: prompt,
+      [modelConfig.inputMapping.videoUrl]: videoUrl
     };
 
-    console.log('Starting audio generation with Thinksound...');
+    // Merge with custom parameters and process types
+    const allParams = { ...baseParams, ...(customParams || {}) };
+    
+    // Process and validate parameters according to schema
+    let input;
+    try {
+      input = processModelParameters(allParams, modelConfig);
+      console.log('Processed parameters:', input);
+    } catch (error) {
+      console.error('Parameter processing error:', error);
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Parameter validation failed' },
+        { status: 400 }
+      );
+    }
+
+    console.log(`Starting audio generation with ${endpoint}...`);
     const prediction = await replicate.predictions.create({
-      version: "zsxkib/thinksound:40d08f9f569e91a5d72f6795ebed75178c185b0434699a98c07fc5f566efb2d4",
+      version: endpoint,
       input,
     });
 

@@ -14,6 +14,14 @@ export interface Scene {
   video_generated: boolean;
   sound_generated: boolean;
   position?: { x: number; y: number };
+  // Per-scene model selection (optional - falls back to global settings)
+  selected_image_model?: string;
+  selected_video_model?: string;
+  selected_audio_model?: string;
+  // Per-scene model parameters (optional - falls back to global settings)
+  image_model_params?: Record<string, unknown>;
+  video_model_params?: Record<string, unknown>;
+  audio_model_params?: Record<string, unknown>;
 }
 
 export interface StoryboardData {
@@ -31,6 +39,10 @@ export interface Settings {
   selected_image_model: string;
   selected_video_model: string;
   selected_audio_model: string;
+  // Global model parameters
+  image_model_params?: Record<string, unknown>;
+  video_model_params?: Record<string, unknown>;
+  audio_model_params?: Record<string, unknown>;
 }
 
 export interface AppState {
@@ -82,7 +94,10 @@ export interface AppState {
   setGenerateAllCancelled: (cancelled: boolean) => void;
   resetStoryboard: () => void;
   loadInitialSettings: () => void;
+
 }
+
+
 
 // Available models
 export const storyboardModels = [
@@ -392,5 +407,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         selected_audio_model: stored.selected_audio_model || 'multi'
       }
     }));
-  }
+  },
+
 })); 

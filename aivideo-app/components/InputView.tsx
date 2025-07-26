@@ -58,7 +58,11 @@ export default function InputView() {
           customModes,
           settings.openai_api_key,
           settings.general_prompt,
-          settings.selected_storyboard_model
+          settings.selected_storyboard_model,
+          settings.selected_image_model,
+          settings.selected_video_model,
+          settings.selected_audio_model,
+          settings.replicate_api_key
         );
       }
       

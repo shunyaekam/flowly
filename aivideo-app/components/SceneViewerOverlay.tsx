@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAppStore, imageModels, videoModels, audioModels } from '@/lib/store';
+import { useAppStore, Scene } from '@/lib/store';
 import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { generateImage, generateVideo, generateAudio, pollForPrediction } from '@/lib/api';
 import { playSounds } from '@/lib/sounds';
+import ModelSelector from './ModelSelector';
 
 export default function SceneViewerOverlay() {
   const { 
@@ -19,7 +20,7 @@ export default function SceneViewerOverlay() {
     getSceneGenerationState,
     cancelGeneration,
     generationCancellation,
-    visualSceneOrder
+    visualSceneOrder,
   } = useAppStore();
   
   // Find the current scene being edited
@@ -39,6 +40,7 @@ export default function SceneViewerOverlay() {
   const [selectedAudioModel, setSelectedAudioModel] = useState(settings.selected_audio_model);
   const [showCancelDialog, setShowCancelDialog] = useState<'image' | 'video' | 'audio' | null>(null);
   const [activePredictions, setActivePredictions] = useState<Map<string, string>>(new Map()); // Map scene-type to prediction ID
+  const [modelSelectorOpen, setModelSelectorOpen] = useState<'image' | 'video' | 'audio' | null>(null);
   
   // Initialize local state when scene changes
   useEffect(() => {
@@ -47,8 +49,14 @@ export default function SceneViewerOverlay() {
       setImagePrompt(currentScene.scene_image_prompt);
       setVideoPrompt(currentScene.scene_video_prompt);
       setAudioPrompt(currentScene.scene_sound_prompt);
+      
+      // Set scene-specific models or fall back to global settings
+      setSelectedImageModel(currentScene.selected_image_model || settings.selected_image_model);
+      setSelectedVideoModel(currentScene.selected_video_model || settings.selected_video_model);
+      setSelectedAudioModel(currentScene.selected_audio_model || settings.selected_audio_model);
     }
-  }, [currentScene]);
+  }, [currentScene, settings.selected_image_model, settings.selected_video_model, settings.selected_audio_model]);
+
   
   // Handle closing the overlay
   const handleClose = () => {
@@ -76,6 +84,65 @@ export default function SceneViewerOverlay() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Model selection handlers
+  const handleModelSelect = (modelId: string, customParams?: Record<string, unknown>) => {
+    const type = modelSelectorOpen; // Get the type from which selector is open
+    if (!type) return;
+    
+    console.log('Scene: Selecting model', modelId, 'for', type, 'with params:', customParams);
+    
+    // Update local state
+    switch (type) {
+      case 'image':
+        setSelectedImageModel(modelId);
+        break;
+      case 'video':
+        setSelectedVideoModel(modelId);
+        break;
+      case 'audio':
+        setSelectedAudioModel(modelId);
+        break;
+    }
+    
+    // Save to scene data immediately
+    if (currentScene) {
+      const sceneUpdateKey = `selected_${type}_model` as keyof Scene;
+      const paramsUpdateKey = `${type}_model_params` as keyof Scene;
+      updateScene(currentScene.id, {
+        [sceneUpdateKey]: modelId,
+        ...(customParams && Object.keys(customParams).length > 0 ? { [paramsUpdateKey]: customParams } : {})
+      });
+    }
+    
+    setModelSelectorOpen(null);
+  };
+
+  const getSelectedModelName = (type: 'image' | 'video' | 'audio') => {
+    let modelId: string;
+    let isSceneSpecific = false;
+    
+    switch (type) {
+      case 'image':
+        modelId = selectedImageModel;
+        isSceneSpecific = !!currentScene?.selected_image_model;
+        break;
+      case 'video':
+        modelId = selectedVideoModel;
+        isSceneSpecific = !!currentScene?.selected_video_model;
+        break;
+      case 'audio':
+        modelId = selectedAudioModel;
+        isSceneSpecific = !!currentScene?.selected_audio_model;
+        break;
+    }
+    
+    if (!modelId) return 'Select model...';
+    
+    // Show just the model name part
+    const displayName = modelId.split('/').pop() || modelId;
+    return isSceneSpecific ? `${displayName} *` : displayName; // * indicates scene-specific
+  };
   
   // Navigation functions
   const navigateToScene = (direction: 'prev' | 'next') => {
@@ -178,7 +245,9 @@ export default function SceneViewerOverlay() {
           if (!settings.replicate_api_key) {
             throw new Error('Please add your Replicate API key in settings');
           }
-          prediction = await generateImage(imagePrompt, settings.replicate_api_key, signal);
+          // Get custom parameters for the image model
+          const imageParams = currentScene.image_model_params || settings.image_model_params || {};
+          prediction = await generateImage(imagePrompt, settings.replicate_api_key, selectedImageModel, signal, imageParams);
           
           // Track the prediction ID
           setActivePredictions(prev => {
@@ -204,7 +273,9 @@ export default function SceneViewerOverlay() {
           if (!currentScene.generated_image) {
             throw new Error('Please generate an image first');
           }
-          prediction = await generateVideo(videoPrompt, currentScene.generated_image, settings.replicate_api_key, signal);
+          // Get custom parameters for the video model
+          const videoParams = currentScene.video_model_params || settings.video_model_params || {};
+          prediction = await generateVideo(videoPrompt, currentScene.generated_image, settings.replicate_api_key, selectedVideoModel, signal, videoParams);
           
           // Track the prediction ID
           setActivePredictions(prev => {
@@ -230,7 +301,9 @@ export default function SceneViewerOverlay() {
           if (!currentScene.generated_video) {
             throw new Error('Please generate a video first');
           }
-          prediction = await generateAudio(currentScene.generated_video, audioPrompt, settings.replicate_api_key, signal);
+          // Get custom parameters for the audio model
+          const audioParams = currentScene.audio_model_params || settings.audio_model_params || {};
+          prediction = await generateAudio(currentScene.generated_video, audioPrompt, settings.replicate_api_key, selectedAudioModel, signal, audioParams);
           
           // Track the prediction ID
           setActivePredictions(prev => {
@@ -387,17 +460,12 @@ export default function SceneViewerOverlay() {
               
               <div>
                 <label className="block text-sm font-light text-white/80 mb-2">model:</label>
-                <select
-                  value={selectedImageModel}
-                  onChange={(e) => setSelectedImageModel(e.target.value)}
-                  className="w-full px-0 py-2 bg-transparent border-none text-white focus:outline-none appearance-none cursor-pointer text-sm"
+                <button
+                  onClick={() => setModelSelectorOpen('image')}
+                  className="w-full px-0 py-2 bg-transparent border-none text-white focus:outline-none cursor-pointer text-sm text-left hover:text-white/80 transition-colors"
                 >
-                  {imageModels.map(model => (
-                    <option key={model.id} value={model.id} className="bg-gray-800">
-                      {model.name}
-                    </option>
-                  ))}
-                </select>
+                  {getSelectedModelName('image')}
+                </button>
               </div>
               
               <button
@@ -441,17 +509,12 @@ export default function SceneViewerOverlay() {
               
               <div>
                 <label className="block text-sm font-light text-white/80 mb-2">model:</label>
-                <select
-                  value={selectedVideoModel}
-                  onChange={(e) => setSelectedVideoModel(e.target.value)}
-                  className="w-full px-0 py-2 bg-transparent border-none text-white focus:outline-none appearance-none cursor-pointer text-sm"
+                <button
+                  onClick={() => setModelSelectorOpen('video')}
+                  className="w-full px-0 py-2 bg-transparent border-none text-white focus:outline-none cursor-pointer text-sm text-left hover:text-white/80 transition-colors"
                 >
-                  {videoModels.map(model => (
-                    <option key={model.id} value={model.id} className="bg-gray-800">
-                      {model.name}
-                    </option>
-                  ))}
-                </select>
+                  {getSelectedModelName('video')}
+                </button>
               </div>
               
               <button
@@ -495,17 +558,12 @@ export default function SceneViewerOverlay() {
               
               <div>
                 <label className="block text-sm font-light text-white/80 mb-2">model:</label>
-                <select
-                  value={selectedAudioModel}
-                  onChange={(e) => setSelectedAudioModel(e.target.value)}
-                  className="w-full px-0 py-2 bg-transparent border-none text-white focus:outline-none appearance-none cursor-pointer text-sm"
+                <button
+                  onClick={() => setModelSelectorOpen('audio')}
+                  className="w-full px-0 py-2 bg-transparent border-none text-white focus:outline-none cursor-pointer text-sm text-left hover:text-white/80 transition-colors"
                 >
-                  {audioModels.map(model => (
-                    <option key={model.id} value={model.id} className="bg-gray-800">
-                      {model.name}
-                    </option>
-                  ))}
-                </select>
+                  {getSelectedModelName('audio')}
+                </button>
               </div>
               
               <button
@@ -533,6 +591,9 @@ export default function SceneViewerOverlay() {
   const rightContent = renderRightContent();
   
   const handleBackdropClick = (e: React.MouseEvent) => {
+    // Don't close if ModelSelector is open
+    if (modelSelectorOpen) return;
+    
     // Close if clicking on the backdrop or main content area (but not on interactive elements)
     const target = e.target as HTMLElement;
     if (
@@ -573,31 +634,31 @@ export default function SceneViewerOverlay() {
       </div>
       
 
+      {/* Scene Navigation Arrows - positioned at top of entire overlay */}
+      {currentSceneIndex > 0 && (
+        <button
+          onClick={() => navigateToScene('prev')}
+          onMouseEnter={() => playSounds.hover()}
+          className="absolute left-4 top-4 z-40 text-white/80 hover:text-white transition-colors"
+        >
+          <ChevronLeft className="w-12 h-12" strokeWidth={1} />
+        </button>
+      )}
+      
+      {currentSceneIndex < totalScenes - 1 && (
+        <button
+          onClick={() => navigateToScene('next')}
+          onMouseEnter={() => playSounds.hover()}
+          className="absolute right-4 top-4 z-40 text-white/80 hover:text-white transition-colors"
+        >
+          <ChevronRight className="w-12 h-12" strokeWidth={1} />
+        </button>
+      )}
+
       {/* Main Content */}
       <div className="h-full flex pt-20 backdrop-clickable" onClick={handleBackdropClick}>
         {/* Left Panel - Scene Content */}
         <div className={`${rightContent ? 'w-1/2' : 'w-full'} h-full backdrop-clickable relative`} onClick={handleBackdropClick}>
-          {/* Scene Navigation Arrows - positioned relative to content area */}
-          {currentSceneIndex > 0 && (
-            <button
-              onClick={() => navigateToScene('prev')}
-              onMouseEnter={() => playSounds.hover()}
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 z-30 text-white/80 hover:text-white transition-colors"
-            >
-              <ChevronLeft className="w-12 h-12" strokeWidth={1} />
-            </button>
-          )}
-          
-          {currentSceneIndex < totalScenes - 1 && (
-            <button
-              onClick={() => navigateToScene('next')}
-              onMouseEnter={() => playSounds.hover()}
-              className="absolute right-4 top-1/2 transform -translate-y-1/2 z-30 text-white/80 hover:text-white transition-colors"
-            >
-              <ChevronRight className="w-12 h-12" strokeWidth={1} />
-            </button>
-          )}
-          
           {renderLeftContent()}
         </div>
         
@@ -645,6 +706,31 @@ export default function SceneViewerOverlay() {
           </div>
         </div>
       )}
+
+      {/* Model Selectors */}
+      <ModelSelector
+        isOpen={modelSelectorOpen === 'image'}
+        onClose={() => setModelSelectorOpen(null)}
+        type="image"
+        sceneId={editingSceneId || undefined}
+        onModelSelect={handleModelSelect}
+      />
+      
+      <ModelSelector
+        isOpen={modelSelectorOpen === 'video'}
+        onClose={() => setModelSelectorOpen(null)}
+        type="video"
+        sceneId={editingSceneId || undefined}
+        onModelSelect={handleModelSelect}
+      />
+      
+      <ModelSelector
+        isOpen={modelSelectorOpen === 'audio'}
+        onClose={() => setModelSelectorOpen(null)}
+        type="audio"
+        sceneId={editingSceneId || undefined}
+        onModelSelect={handleModelSelect}
+      />
     </div>
   );
 } 

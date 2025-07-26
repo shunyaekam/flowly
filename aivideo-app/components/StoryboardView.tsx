@@ -554,7 +554,7 @@ function StoryboardFlow() {
             
             switch (type) {
               case 'images':
-                prediction = await generateImage(scene.scene_image_prompt, settings.replicate_api_key, signal);
+                prediction = await generateImage(scene.scene_image_prompt, settings.replicate_api_key, settings.selected_image_model, signal);
                 
                 // Track the prediction ID
                 setActivePredictions(prev => {
@@ -574,7 +574,7 @@ function StoryboardFlow() {
                 
               case 'videos':
                 if (scene.generated_image) {
-                  prediction = await generateVideo(scene.scene_video_prompt, scene.generated_image, settings.replicate_api_key, signal);
+                  prediction = await generateVideo(scene.scene_video_prompt, scene.generated_image, settings.replicate_api_key, settings.selected_video_model, signal);
                   
                   // Track the prediction ID
                   setActivePredictions(prev => {
@@ -595,7 +595,7 @@ function StoryboardFlow() {
                 
               case 'sounds':
                 if (scene.generated_video) {
-                  prediction = await generateAudio(scene.generated_video, scene.scene_sound_prompt, settings.replicate_api_key, signal);
+                  prediction = await generateAudio(scene.generated_video, scene.scene_sound_prompt, settings.replicate_api_key, settings.selected_audio_model, signal);
                   
                   // Track the prediction ID
                   setActivePredictions(prev => {
@@ -799,7 +799,10 @@ function StoryboardFlow() {
           onEdgeClick={onEdgeClick}
           nodeTypes={nodeTypes}
           fitView
-          onInit={(instance) => instance.fitView()}
+          onInit={(instance) => {
+            // Delay fitView to ensure nodes are rendered
+            setTimeout(() => instance.fitView(), 100);
+          }}
           fitViewOptions={{
             padding: 20,
             minZoom: 0.1,

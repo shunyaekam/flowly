@@ -6,13 +6,11 @@ import {
   useAppStore, 
   Settings, 
   storyboardModels, 
-  imageModels,
-  videoModels,
-  audioModels,
   TOPIC_PROMPTS,
   GENERAL_PROMPT,
   EXAMPLE_PROMPTS
 } from '@/lib/store';
+import ModelSelector from './ModelSelector';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -24,6 +22,88 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [localSettings, setLocalSettings] = useState<Settings>(settings);
   const [showExamplePrompts, setShowExamplePrompts] = useState(false);
   const [currentModePrompt, setCurrentModePrompt] = useState('');
+  const [modelSelectorOpen, setModelSelectorOpen] = useState<'image' | 'video' | 'audio' | null>(null);
+  const [dynamicExamples, setDynamicExamples] = useState<string>('');
+
+  // Function to fetch model examples using direct Replicate API
+  const fetchModelExamples = async (modelId: string): Promise<string[]> => {
+    if (!settings.replicate_api_key || !modelId) return [];
+    
+    try {
+      // Use a server-side helper to fetch model data
+      const response = await fetch('/api/model-examples', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          modelId,
+          apiKey: settings.replicate_api_key
+        })
+      });
+
+      if (!response.ok) return [];
+
+      const examples = await response.json();
+      
+      // Format examples with prefixes for display
+      return examples.map((ex: string, i: number) => `${i + 1}. "${ex}"`);
+      
+    } catch (error) {
+      console.error('Failed to fetch model examples:', error);
+      return [];
+    }
+  };
+
+  // Load dynamic examples when settings change
+  const loadDynamicExamples = async () => {
+    if (!settings.replicate_api_key) {
+      console.log('No Replicate API key, skipping dynamic examples');
+      setDynamicExamples('');
+      return;
+    }
+
+    console.log('Loading dynamic examples for models:', {
+      image: settings.selected_image_model,
+      video: settings.selected_video_model,
+      audio: settings.selected_audio_model
+    });
+
+    try {
+      const [imageExamples, videoExamples, audioExamples] = await Promise.all([
+        settings.selected_image_model ? fetchModelExamples(settings.selected_image_model) : Promise.resolve([]),
+        settings.selected_video_model ? fetchModelExamples(settings.selected_video_model) : Promise.resolve([]),
+        settings.selected_audio_model ? fetchModelExamples(settings.selected_audio_model) : Promise.resolve([])
+      ]);
+
+      console.log('Fetched examples:', { imageExamples, videoExamples, audioExamples });
+
+      let exampleText = '';
+      
+      if (imageExamples.length > 0) {
+        exampleText += `IMAGE MODEL (${settings.selected_image_model}):\n${imageExamples.map((ex, i) => `${i + 1}. ${ex}`).join('\n')}\n\n`;
+      }
+      
+      if (videoExamples.length > 0) {
+        exampleText += `VIDEO MODEL (${settings.selected_video_model}):\n${videoExamples.map((ex, i) => `${i + 1}. ${ex}`).join('\n')}\n\n`;
+      }
+      
+      if (audioExamples.length > 0) {
+        exampleText += `AUDIO MODEL (${settings.selected_audio_model}):\n${audioExamples.map((ex, i) => `${i + 1}. ${ex}`).join('\n')}\n\n`;
+      }
+
+      if (exampleText) {
+        setDynamicExamples(exampleText.trim());
+        console.log('Set dynamic examples successfully');
+      } else {
+        setDynamicExamples('No examples found for selected models.');
+        console.log('No examples found for any selected models');
+      }
+    } catch (error) {
+      console.error('Failed to load dynamic examples:', error);
+      setDynamicExamples('Failed to load model examples.');
+    }
+  };
   
   // Initialize mode prompt when modal opens or mode changes
   useEffect(() => {
@@ -34,8 +114,17 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         TOPIC_PROMPTS[selectedMode as keyof typeof TOPIC_PROMPTS]?.prompt || 
                         '';
       setCurrentModePrompt(modePrompt);
+      // Load dynamic examples
+      loadDynamicExamples();
     }
   }, [isOpen, settings, selectedMode]);
+
+  // Reload examples when models change
+  useEffect(() => {
+    if (isOpen) {
+      loadDynamicExamples();
+    }
+  }, [settings.selected_image_model, settings.selected_video_model, settings.selected_audio_model, settings.replicate_api_key]);
   
   const handleSettingChange = (key: keyof Settings, value: string) => {
     const updatedSettings = {
@@ -101,8 +190,40 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       '';
     setCurrentModePrompt(modePrompt);
   };
+
+  const handleModelSelect = (modelId: string, customParams?: Record<string, unknown>) => {
+    const type = modelSelectorOpen; // Get the type from which selector is open
+    if (!type) return;
+    
+    console.log('Settings: Selecting model', modelId, 'for', type, 'with params:', customParams);
+    
+    // Update both model and params together
+    const settingKey = `selected_${type}_model` as keyof Settings;
+    const paramsKey = `${type}_model_params` as keyof Settings;
+    
+    const updatedSettings = {
+      ...localSettings,
+      [settingKey]: modelId,
+      ...(customParams && Object.keys(customParams).length > 0 ? { [paramsKey]: customParams } : {})
+    };
+    
+    setLocalSettings(updatedSettings);
+    setSettings(updatedSettings);
+    setModelSelectorOpen(null);
+  };
+
+  const getSelectedModelName = (type: 'image' | 'video' | 'audio') => {
+    const modelId = localSettings[`selected_${type}_model` as keyof Settings] as string;
+    if (!modelId) return 'Select model...';
+    
+    // Show just the model name part
+    return modelId.split('/').pop() || modelId;
+  };
   
   const handleBackdropClick = (e: React.MouseEvent) => {
+    // Don't close if ModelSelector is open
+    if (modelSelectorOpen) return;
+    
     // Close if clicking on the backdrop or main content area (but not on interactive elements)
     const target = e.target as HTMLElement;
     if (
@@ -197,54 +318,45 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <label className="block text-sm font-light text-white/80 mb-2">
                 image:
               </label>
-              <select
-                value={localSettings.selected_image_model}
-                onChange={(e) => handleSettingChange('selected_image_model', e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                className="w-full px-0 py-2 bg-transparent border-none text-white focus:outline-none appearance-none cursor-pointer text-sm"
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setModelSelectorOpen('image');
+                }}
+                className="w-full px-0 py-2 bg-transparent border-none text-white focus:outline-none cursor-pointer text-sm text-left hover:text-white/80 transition-colors"
               >
-                {imageModels.map(model => (
-                  <option key={model.id} value={model.id} className="bg-gray-800">
-                    {model.name}
-                  </option>
-                ))}
-              </select>
+                {getSelectedModelName('image')}
+              </button>
             </div>
             
             <div>
               <label className="block text-sm font-light text-white/80 mb-2">
                 video:
               </label>
-              <select
-                value={localSettings.selected_video_model}
-                onChange={(e) => handleSettingChange('selected_video_model', e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                className="w-full px-0 py-2 bg-transparent border-none text-white focus:outline-none appearance-none cursor-pointer text-sm"
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setModelSelectorOpen('video');
+                }}
+                className="w-full px-0 py-2 bg-transparent border-none text-white focus:outline-none cursor-pointer text-sm text-left hover:text-white/80 transition-colors"
               >
-                {videoModels.map(model => (
-                  <option key={model.id} value={model.id} className="bg-gray-800">
-                    {model.name}
-                  </option>
-                ))}
-              </select>
+                {getSelectedModelName('video')}
+              </button>
             </div>
             
             <div>
               <label className="block text-sm font-light text-white/80 mb-2">
                 audio:
               </label>
-              <select
-                value={localSettings.selected_audio_model}
-                onChange={(e) => handleSettingChange('selected_audio_model', e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                className="w-full px-0 py-2 bg-transparent border-none text-white focus:outline-none appearance-none cursor-pointer text-sm"
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setModelSelectorOpen('audio');
+                }}
+                className="w-full px-0 py-2 bg-transparent border-none text-white focus:outline-none cursor-pointer text-sm text-left hover:text-white/80 transition-colors"
               >
-                {audioModels.map(model => (
-                  <option key={model.id} value={model.id} className="bg-gray-800">
-                    {model.name}
-                  </option>
-                ))}
-              </select>
+                {getSelectedModelName('audio')}
+              </button>
             </div>
           </div>
           
@@ -336,9 +448,18 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             
             {showExamplePrompts && (
               <div className="p-2">
-                <pre className="text-white/70 text-xs font-mono whitespace-pre-wrap leading-relaxed">
-                  {EXAMPLE_PROMPTS}
-                </pre>
+                {dynamicExamples ? (
+                  <div>
+                    <h4 className="text-white/90 text-sm font-light mb-3">selected model examples:</h4>
+                    <pre className="text-white/70 text-xs font-mono whitespace-pre-wrap leading-relaxed">
+                      {dynamicExamples}
+                    </pre>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-white/50 text-sm">Select models to see examples, or add Replicate API key to fetch dynamic examples.</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -347,8 +468,30 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       
       {/* Version number */}
       <div className="absolute bottom-4 right-4">
-        <span className="text-white/30 text-xs font-light">v0.7</span>
+        <span className="text-white/30 text-xs font-light">v0.8</span>
       </div>
+
+      {/* Model Selectors */}
+      <ModelSelector
+        isOpen={modelSelectorOpen === 'image'}
+        onClose={() => setModelSelectorOpen(null)}
+        type="image"
+        onModelSelect={handleModelSelect}
+      />
+      
+      <ModelSelector
+        isOpen={modelSelectorOpen === 'video'}
+        onClose={() => setModelSelectorOpen(null)}
+        type="video"
+        onModelSelect={handleModelSelect}
+      />
+      
+      <ModelSelector
+        isOpen={modelSelectorOpen === 'audio'}
+        onClose={() => setModelSelectorOpen(null)}
+        type="audio"
+        onModelSelect={handleModelSelect}
+      />
     </div>
   );
 } 
