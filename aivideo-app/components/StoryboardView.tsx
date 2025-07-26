@@ -799,7 +799,10 @@ function StoryboardFlow() {
           onEdgeClick={onEdgeClick}
           nodeTypes={nodeTypes}
           fitView
-          onInit={(instance) => instance.fitView()}
+          onInit={(instance) => {
+            // Delay fitView to ensure nodes are rendered
+            setTimeout(() => instance.fitView(), 100);
+          }}
           fitViewOptions={{
             padding: 20,
             minZoom: 0.1,

@@ -43,18 +43,29 @@ export async function POST(request: NextRequest) {
       auth: apiKey,
     });
 
-    // Use model config if available, otherwise use default Thinksound
-    const endpoint = modelConfig ? modelConfig.endpoint : "zsxkib/thinksound:40d08f9f569e91a5d72f6795ebed75178c185b0434699a98c07fc5f566efb2d4";
-    let input = modelConfig ? {
+    if (!modelConfig) {
+      return NextResponse.json(
+        { error: 'Model configuration required' },
+        { status: 400 }
+      );
+    }
+
+    // Ensure we have a proper version hash
+    if (!modelConfig.version) {
+      return NextResponse.json(
+        { error: `Model ${modelConfig.endpoint} missing version hash` },
+        { status: 400 }
+      );
+    }
+    
+    // Build proper endpoint with version
+    const endpoint = modelConfig.endpoint.includes(':') 
+      ? modelConfig.endpoint 
+      : `${modelConfig.endpoint}:${modelConfig.version}`;
+    let input = {
       ...modelConfig.defaultParams,
       [modelConfig.inputMapping.prompt || 'caption']: prompt,
       [modelConfig.inputMapping.videoUrl || 'video']: videoUrl
-    } : {
-      caption: prompt,
-      cfg: 5,
-      num_inference_steps: 24,
-      video: videoUrl,
-      cot: prompt,
     };
 
     // Apply custom parameters if provided
@@ -62,19 +73,13 @@ export async function POST(request: NextRequest) {
       console.log('Applying custom parameters:', customParams);
       input = { ...input, ...customParams };
       // Ensure prompt and videoUrl are still set correctly
-      if (modelConfig) {
-        input[modelConfig.inputMapping.prompt || 'caption'] = prompt;
-        input[modelConfig.inputMapping.videoUrl || 'video'] = videoUrl;
-      } else {
-        input.caption = prompt;
-        input.video = videoUrl;
-        input.cot = prompt;
-      }
+      input[modelConfig.inputMapping.prompt || 'caption'] = prompt;
+      input[modelConfig.inputMapping.videoUrl || 'video'] = videoUrl;
     }
 
     console.log(`Starting audio generation with ${endpoint}...`);
     const prediction = await replicate.predictions.create({
-      model: endpoint,
+      version: endpoint,
       input,
     });
 

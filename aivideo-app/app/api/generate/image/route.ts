@@ -4,7 +4,7 @@ import { modelRegistry } from "@/lib/model-registry/registry";
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt, apiKey, modelId, customParams } = await request.json();
+    const { prompt, apiKey, modelId, customParams, modelData } = await request.json();
 
     console.log('Image generation request:', { prompt: prompt?.substring(0, 100) + '...', hasApiKey: !!apiKey, modelId });
 
@@ -22,31 +22,73 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get model config from registry if modelId is provided, otherwise fallback to default
-    let modelConfig = null;
-    if (modelId) {
-      modelConfig = await modelRegistry.getModel(modelId);
-      if (!modelConfig) {
-        return NextResponse.json(
-          { error: 'Model not found' },
-          { status: 404 }
-        );
-      }
-    }
-
     console.log('Initializing Replicate client...');
     const replicate = new Replicate({
       auth: apiKey,
     });
 
-    // Use model config if available, otherwise use default Seedream-3
-    const endpoint = modelConfig ? modelConfig.endpoint : "bytedance/seedream-3";
-    let input = modelConfig ? {
+    // Try to get model config from registry, if not found, fetch directly from Replicate
+    let modelConfig = null;
+    if (modelId) {
+      modelConfig = await modelRegistry.getModel(modelId);
+      
+      // If not in registry, try fetching from Replicate directly
+      if (!modelConfig) {
+        console.log(`Model ${modelId} not in registry, fetching from Replicate...`);
+        try {
+          const replicateResponse = await fetch(`https://api.replicate.com/v1/models`, {
+            method: 'QUERY',
+            headers: {
+              'Authorization': `Token ${apiKey}`,
+              'Content-Type': 'text/plain'
+            },
+            body: modelId
+          });
+          
+          if (replicateResponse.ok) {
+            const data = await replicateResponse.json();
+            const model = data.results?.find((m: any) => `${m.owner}/${m.name}` === modelId);
+            
+            if (model && model.latest_version?.id) {
+              console.log(`Found model ${modelId} with version ${model.latest_version.id}`);
+              // Create a simple config for this model
+              modelConfig = {
+                endpoint: modelId,
+                version: model.latest_version.id,
+                defaultParams: {},
+                inputMapping: { prompt: 'prompt' }
+              };
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch model from Replicate:', error);
+        }
+      }
+    }
+
+    if (!modelConfig) {
+      return NextResponse.json(
+        { error: 'Model not found' },
+        { status: 404 }
+      );
+    }
+
+    // Ensure we have a proper version hash
+    if (!modelConfig.version) {
+      return NextResponse.json(
+        { error: `Model ${modelConfig.endpoint} missing version hash` },
+        { status: 400 }
+      );
+    }
+    
+    // Build proper endpoint with version
+    const endpoint = modelConfig.endpoint.includes(':') 
+      ? modelConfig.endpoint 
+      : `${modelConfig.endpoint}:${modelConfig.version}`;
+    
+    let input = {
       ...modelConfig.defaultParams,
       [modelConfig.inputMapping.prompt || 'prompt']: prompt
-    } : {
-      prompt: prompt,
-      aspect_ratio: "9:16"
     };
 
     // Apply custom parameters if provided
@@ -54,16 +96,12 @@ export async function POST(request: NextRequest) {
       console.log('Applying custom parameters:', customParams);
       input = { ...input, ...customParams };
       // Ensure prompt is still set correctly
-      if (modelConfig) {
-        input[modelConfig.inputMapping.prompt || 'prompt'] = prompt;
-      } else {
-        input.prompt = prompt;
-      }
+      input[modelConfig.inputMapping.prompt || 'prompt'] = prompt;
     }
 
     console.log(`Starting Replicate model run with ${endpoint}...`);
     const prediction = await replicate.predictions.create({
-      model: endpoint,
+      version: endpoint,
       input,
     });
 

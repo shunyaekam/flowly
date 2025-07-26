@@ -43,16 +43,29 @@ export async function POST(request: NextRequest) {
       auth: apiKey,
     });
 
-    // Use model config if available, otherwise use default Kling v2.1
-    const endpoint = modelConfig ? modelConfig.endpoint : "kwaivgi/kling-v2.1";
-    let input = modelConfig ? {
+    if (!modelConfig) {
+      return NextResponse.json(
+        { error: 'Model configuration required' },
+        { status: 400 }
+      );
+    }
+
+    // Ensure we have a proper version hash
+    if (!modelConfig.version) {
+      return NextResponse.json(
+        { error: `Model ${modelConfig.endpoint} missing version hash` },
+        { status: 400 }
+      );
+    }
+    
+    // Build proper endpoint with version
+    const endpoint = modelConfig.endpoint.includes(':') 
+      ? modelConfig.endpoint 
+      : `${modelConfig.endpoint}:${modelConfig.version}`;
+    let input = {
       ...modelConfig.defaultParams,
       [modelConfig.inputMapping.prompt || 'prompt']: prompt,
       [modelConfig.inputMapping.imageUrl || 'start_image']: imageUrl
-    } : {
-      prompt: prompt,
-      start_image: imageUrl,
-      mode: "pro"
     };
 
     // Apply custom parameters if provided
@@ -60,18 +73,13 @@ export async function POST(request: NextRequest) {
       console.log('Applying custom parameters:', customParams);
       input = { ...input, ...customParams };
       // Ensure prompt and imageUrl are still set correctly
-      if (modelConfig) {
-        input[modelConfig.inputMapping.prompt || 'prompt'] = prompt;
-        input[modelConfig.inputMapping.imageUrl || 'start_image'] = imageUrl;
-      } else {
-        input.prompt = prompt;
-        input.start_image = imageUrl;
-      }
+      input[modelConfig.inputMapping.prompt || 'prompt'] = prompt;
+      input[modelConfig.inputMapping.imageUrl || 'start_image'] = imageUrl;
     }
 
     console.log(`Starting video generation with ${endpoint}...`);
     const prediction = await replicate.predictions.create({
-      model: endpoint,
+      version: endpoint,
       input,
     });
 

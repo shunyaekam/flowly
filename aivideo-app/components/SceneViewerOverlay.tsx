@@ -648,31 +648,31 @@ export default function SceneViewerOverlay() {
       </div>
       
 
+      {/* Scene Navigation Arrows - positioned at top of entire overlay */}
+      {currentSceneIndex > 0 && (
+        <button
+          onClick={() => navigateToScene('prev')}
+          onMouseEnter={() => playSounds.hover()}
+          className="absolute left-4 top-4 z-40 text-white/80 hover:text-white transition-colors"
+        >
+          <ChevronLeft className="w-12 h-12" strokeWidth={1} />
+        </button>
+      )}
+      
+      {currentSceneIndex < totalScenes - 1 && (
+        <button
+          onClick={() => navigateToScene('next')}
+          onMouseEnter={() => playSounds.hover()}
+          className="absolute right-4 top-4 z-40 text-white/80 hover:text-white transition-colors"
+        >
+          <ChevronRight className="w-12 h-12" strokeWidth={1} />
+        </button>
+      )}
+
       {/* Main Content */}
       <div className="h-full flex pt-20 backdrop-clickable" onClick={handleBackdropClick}>
         {/* Left Panel - Scene Content */}
         <div className={`${rightContent ? 'w-1/2' : 'w-full'} h-full backdrop-clickable relative`} onClick={handleBackdropClick}>
-          {/* Scene Navigation Arrows - positioned in top corners */}
-          {currentSceneIndex > 0 && (
-            <button
-              onClick={() => navigateToScene('prev')}
-              onMouseEnter={() => playSounds.hover()}
-              className="absolute left-4 top-4 z-30 text-white/80 hover:text-white transition-colors"
-            >
-              <ChevronLeft className="w-12 h-12" strokeWidth={1} />
-            </button>
-          )}
-          
-          {currentSceneIndex < totalScenes - 1 && (
-            <button
-              onClick={() => navigateToScene('next')}
-              onMouseEnter={() => playSounds.hover()}
-              className="absolute right-4 top-4 z-30 text-white/80 hover:text-white transition-colors"
-            >
-              <ChevronRight className="w-12 h-12" strokeWidth={1} />
-            </button>
-          )}
-          
           {renderLeftContent()}
         </div>
         
