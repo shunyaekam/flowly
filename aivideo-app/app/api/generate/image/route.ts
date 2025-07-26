@@ -1,11 +1,12 @@
 import Replicate from "replicate";
 import { NextRequest, NextResponse } from "next/server";
+import { modelRegistry } from "@/lib/model-registry/registry";
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt, apiKey } = await request.json();
+    const { prompt, apiKey, modelId, customParams } = await request.json();
 
-    console.log('Image generation request:', { prompt: prompt?.substring(0, 100) + '...', hasApiKey: !!apiKey });
+    console.log('Image generation request:', { prompt: prompt?.substring(0, 100) + '...', hasApiKey: !!apiKey, modelId });
 
     if (!prompt) {
       return NextResponse.json(
@@ -21,19 +22,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get model config from registry if modelId is provided, otherwise fallback to default
+    let modelConfig = null;
+    if (modelId) {
+      modelConfig = await modelRegistry.getModel(modelId);
+      if (!modelConfig) {
+        return NextResponse.json(
+          { error: 'Model not found' },
+          { status: 404 }
+        );
+      }
+    }
+
     console.log('Initializing Replicate client...');
     const replicate = new Replicate({
       auth: apiKey,
     });
 
-    const input = {
+    // Use model config if available, otherwise use default Seedream-3
+    const endpoint = modelConfig ? modelConfig.endpoint : "bytedance/seedream-3";
+    let input = modelConfig ? {
+      ...modelConfig.defaultParams,
+      [modelConfig.inputMapping.prompt || 'prompt']: prompt
+    } : {
       prompt: prompt,
       aspect_ratio: "9:16"
     };
 
-    console.log('Starting Replicate model run with Seedream-3...');
+    // Apply custom parameters if provided
+    if (customParams && typeof customParams === 'object') {
+      console.log('Applying custom parameters:', customParams);
+      input = { ...input, ...customParams };
+      // Ensure prompt is still set correctly
+      if (modelConfig) {
+        input[modelConfig.inputMapping.prompt || 'prompt'] = prompt;
+      } else {
+        input.prompt = prompt;
+      }
+    }
+
+    console.log(`Starting Replicate model run with ${endpoint}...`);
     const prediction = await replicate.predictions.create({
-      version: "bytedance/seedream-3",
+      version: endpoint,
       input,
     });
 

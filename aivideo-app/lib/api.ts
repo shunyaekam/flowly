@@ -24,6 +24,98 @@ export function safeFilename(s: string): string {
   return s.replace(/[^\w\-_\. ]/g, '_').slice(0, 50);
 }
 
+// Function to fetch model examples dynamically
+async function fetchModelExamples(modelId: string, replicateApiKey: string): Promise<string[]> {
+  if (!replicateApiKey || !modelId) {
+    console.log('Missing API key or model ID for fetchModelExamples');
+    return [];
+  }
+  
+  console.log(`Fetching examples for model: ${modelId}`);
+  
+  try {
+    // First try to get the specific model by exact ID from our proxy route
+    let response = await fetch(`/api/models?search=${encodeURIComponent(modelId)}`, {
+      headers: {
+        'x-replicate-token': replicateApiKey,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      console.error(`API response not ok: ${response.status} ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    console.log('API response data:', data);
+    
+    const model = data.results?.find((m: any) => `${m.owner}/${m.name}` === modelId);
+    
+    if (!model) {
+      console.log(`Model ${modelId} not found in search results`);
+      return [];
+    }
+
+    console.log('Found model:', model.name, 'by', model.owner);
+
+    const examples = [];
+    
+    // Get examples from multiple sources
+    if (model.default_example?.input) {
+      const input = model.default_example.input;
+      console.log('Found default_example.input:', input);
+      
+      // Extract all available prompts
+      if (input.prompt) examples.push(input.prompt);
+      if (input.image_prompt) examples.push(input.image_prompt);
+      if (input.video_prompt) examples.push(input.video_prompt);
+      if (input.audio_prompt) examples.push(input.audio_prompt);
+      if (input.text) examples.push(input.text);
+      if (input.description) examples.push(input.description);
+      if (input.input_text) examples.push(input.input_text);
+      if (input.query) examples.push(input.query);
+    } else {
+      console.log('No default_example.input found');
+    }
+
+    // Also check if there are example predictions or versions with examples
+    if (model.latest_version?.openapi_schema?.components?.schemas?.Input?.properties) {
+      const props = model.latest_version.openapi_schema.components.schemas.Input.properties;
+      console.log('Found schema properties:', Object.keys(props));
+      
+      // Look for examples in schema properties
+      Object.entries(props).forEach(([key, prop]: [string, any]) => {
+        if (prop.example && typeof prop.example === 'string' && prop.example.length > 10) {
+          console.log(`Found example in ${key}:`, prop.example.substring(0, 50) + '...');
+          examples.push(prop.example);
+        }
+        if (prop.examples && Array.isArray(prop.examples)) {
+          prop.examples.forEach((ex: any) => {
+            if (typeof ex === 'string' && ex.length > 10) {
+              console.log(`Found example in ${key}.examples:`, ex.substring(0, 50) + '...');
+              examples.push(ex);
+            }
+          });
+        }
+      });
+    } else {
+      console.log('No schema properties found');
+    }
+    
+    console.log(`Found ${examples.length} examples for ${modelId}`);
+    
+    // Remove duplicates and return up to 5 examples
+    const uniqueExamples = [...new Set(examples)].slice(0, 5);
+    console.log('Returning examples:', uniqueExamples.map(ex => ex.substring(0, 100) + '...'));
+    return uniqueExamples;
+    
+  } catch (error) {
+    console.error(`Failed to fetch model examples for ${modelId}:`, error);
+    return [];
+  }
+}
+
 // OpenAI API integration
 export async function generateStoryboard(
   userInput: string,
@@ -31,7 +123,11 @@ export async function generateStoryboard(
   customModes: Record<string, string>,
   apiKey: string,
   generalPrompt: string,
-  selectedModel?: string
+  selectedModel?: string,
+  selectedImageModel?: string,
+  selectedVideoModel?: string,
+  selectedAudioModel?: string,
+  replicateApiKey?: string
 ): Promise<StoryboardData> {
   if (!apiKey) {
     throw new Error('OpenAI API key is required');
@@ -54,8 +150,30 @@ export async function generateStoryboard(
     topicPrompt = `Create a video script about: ${userInput}`;
   }
 
+  // Fetch dynamic model examples if possible
+  let imageExamples = MODEL_EXAMPLES.image_examples;
+  let videoExamples = MODEL_EXAMPLES.video_examples;
+  let soundExamples = MODEL_EXAMPLES.sound_examples;
+
+  if (replicateApiKey) {
+    try {
+      const [dynamicImageExamples, dynamicVideoExamples, dynamicAudioExamples] = await Promise.all([
+        selectedImageModel ? fetchModelExamples(selectedImageModel, replicateApiKey) : Promise.resolve([]),
+        selectedVideoModel ? fetchModelExamples(selectedVideoModel, replicateApiKey) : Promise.resolve([]),
+        selectedAudioModel ? fetchModelExamples(selectedAudioModel, replicateApiKey) : Promise.resolve([])
+      ]);
+
+      // Use dynamic examples if available, fall back to static ones
+      if (dynamicImageExamples.length > 0) imageExamples = dynamicImageExamples;
+      if (dynamicVideoExamples.length > 0) videoExamples = dynamicVideoExamples;
+      if (dynamicAudioExamples.length > 0) soundExamples = dynamicAudioExamples;
+    } catch (error) {
+      console.error('Failed to fetch dynamic model examples, using static ones:', error);
+    }
+  }
+
   // Build comprehensive system prompt
-  const systemPrompt = `You are an expert video storyboard creator. Your task is to create detailed storyboards for TikTok-style videos.\n\nTOPIC PROMPT:\n${topicPrompt}\n\nGENERAL INSTRUCTIONS:\n${generalPrompt || GENERAL_PROMPT}\n\nFORMAT:\n{\n  "scenes": [\n    {\n      "scene": "Scene script",\n      "scene_image_prompt": "...",\n      "scene_video_prompt": "...",\n      "scene_sound_prompt": "..."\n    },\n    ...\n  ]\n}\n\nMODEL EXAMPLES:\n\nImage prompts should be detailed and cinematic like these examples:\n${MODEL_EXAMPLES.image_examples.map((ex, i) => `${i + 1}. ${ex}`).join('\n')}\n\nVideo prompts should be simple motion descriptions like these examples:\n${MODEL_EXAMPLES.video_examples.map((ex, i) => `${i + 1}. ${ex}`).join('\n')}\n\nSound prompts should be detailed audio descriptions like these examples:\n${MODEL_EXAMPLES.sound_examples.map((ex, i) => `${i + 1}. ${ex}`).join('\n')}\n\nIMPORTANT: Your response must be ONLY valid JSON with no additional text, explanations, or markdown formatting.`;
+  const systemPrompt = `You are an expert video storyboard creator. Your task is to create detailed storyboards for TikTok-style videos.\n\nTOPIC PROMPT:\n${topicPrompt}\n\nGENERAL INSTRUCTIONS:\n${generalPrompt || GENERAL_PROMPT}\n\nFORMAT:\n{\n  "scenes": [\n    {\n      "scene": "Scene script",\n      "scene_image_prompt": "...",\n      "scene_video_prompt": "...",\n      "scene_sound_prompt": "..."\n    },\n    ...\n  ]\n}\n\nMODEL EXAMPLES:\n\nImage prompts should be detailed and cinematic like these examples:\n${imageExamples.map((ex, i) => `${i + 1}. ${ex}`).join('\n')}\n\nVideo prompts should be simple motion descriptions like these examples:\n${videoExamples.map((ex, i) => `${i + 1}. ${ex}`).join('\n')}\n\nSound prompts should be detailed audio descriptions like these examples:\n${soundExamples.map((ex, i) => `${i + 1}. ${ex}`).join('\n')}\n\nIMPORTANT: Your response must be ONLY valid JSON with no additional text, explanations, or markdown formatting.`;
 
   // Log the model and parameters being used
   console.log('[OpenAI API] Using model:', modelConfig.model_id, 'with params:', modelConfig.params);
@@ -138,14 +256,14 @@ type Prediction = {
 // Note: Replicate integration is now handled server-side via Next.js API routes
 
 // Image generation using Next.js API route
-export async function generateImage(prompt: string, apiKey: string, signal?: AbortSignal): Promise<Prediction> {
+export async function generateImage(prompt: string, apiKey: string, modelId?: string, signal?: AbortSignal, customParams?: Record<string, any>): Promise<Prediction> {
   try {
     const response = await fetch('/api/generate/image', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ prompt, apiKey }),
+      body: JSON.stringify({ prompt, apiKey, modelId, customParams }),
       signal
     });
 
@@ -178,14 +296,14 @@ export async function generateImage(prompt: string, apiKey: string, signal?: Abo
 }
 
 // Video generation using Next.js API route
-export async function generateVideo(prompt: string, imageUrl: string, apiKey: string, signal?: AbortSignal): Promise<Prediction> {
+export async function generateVideo(prompt: string, imageUrl: string, apiKey: string, modelId?: string, signal?: AbortSignal, customParams?: Record<string, any>): Promise<Prediction> {
   try {
     const response = await fetch('/api/generate/video', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ prompt, imageUrl, apiKey }),
+      body: JSON.stringify({ prompt, imageUrl, apiKey, modelId, customParams }),
       signal
     });
 
@@ -205,14 +323,14 @@ export async function generateVideo(prompt: string, imageUrl: string, apiKey: st
 }
 
 // Audio generation using Next.js API route
-export async function generateAudio(videoUrl: string, prompt: string, apiKey: string, signal?: AbortSignal): Promise<Prediction> {
+export async function generateAudio(videoUrl: string, prompt: string, apiKey: string, modelId?: string, signal?: AbortSignal, customParams?: Record<string, any>): Promise<Prediction> {
   try {
     const response = await fetch('/api/generate/audio', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ prompt, videoUrl, apiKey }),
+      body: JSON.stringify({ prompt, videoUrl, apiKey, modelId, customParams }),
       signal
     });
 

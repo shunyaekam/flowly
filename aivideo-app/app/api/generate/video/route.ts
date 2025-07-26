@@ -1,14 +1,16 @@
 import Replicate from "replicate";
 import { NextRequest, NextResponse } from "next/server";
+import { modelRegistry } from "@/lib/model-registry/registry";
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt, imageUrl, apiKey } = await request.json();
+    const { prompt, imageUrl, apiKey, modelId, customParams } = await request.json();
 
     console.log('Video generation request:', { 
       prompt: prompt?.substring(0, 100) + '...', 
       imageUrl: imageUrl?.substring(0, 100) + '...',
-      hasApiKey: !!apiKey 
+      hasApiKey: !!apiKey,
+      modelId
     });
 
     if (!prompt || !imageUrl) {
@@ -25,19 +27,51 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get model config from registry if modelId is provided, otherwise fallback to default
+    let modelConfig = null;
+    if (modelId) {
+      modelConfig = await modelRegistry.getModel(modelId);
+      if (!modelConfig) {
+        return NextResponse.json(
+          { error: 'Model not found' },
+          { status: 404 }
+        );
+      }
+    }
+
     const replicate = new Replicate({
       auth: apiKey,
     });
 
-    const input = {
+    // Use model config if available, otherwise use default Kling v2.1
+    const endpoint = modelConfig ? modelConfig.endpoint : "kwaivgi/kling-v2.1";
+    let input = modelConfig ? {
+      ...modelConfig.defaultParams,
+      [modelConfig.inputMapping.prompt || 'prompt']: prompt,
+      [modelConfig.inputMapping.imageUrl || 'start_image']: imageUrl
+    } : {
       prompt: prompt,
       start_image: imageUrl,
       mode: "pro"
     };
 
-    console.log('Starting video generation with Kling v2.1...');
+    // Apply custom parameters if provided
+    if (customParams && typeof customParams === 'object') {
+      console.log('Applying custom parameters:', customParams);
+      input = { ...input, ...customParams };
+      // Ensure prompt and imageUrl are still set correctly
+      if (modelConfig) {
+        input[modelConfig.inputMapping.prompt || 'prompt'] = prompt;
+        input[modelConfig.inputMapping.imageUrl || 'start_image'] = imageUrl;
+      } else {
+        input.prompt = prompt;
+        input.start_image = imageUrl;
+      }
+    }
+
+    console.log(`Starting video generation with ${endpoint}...`);
     const prediction = await replicate.predictions.create({
-      version: "kwaivgi/kling-v2.1",
+      version: endpoint,
       input,
     });
 
