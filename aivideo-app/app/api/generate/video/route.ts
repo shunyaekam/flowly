@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`Starting video generation with ${endpoint}...`);
     const prediction = await replicate.predictions.create({
-      version: endpoint,
+      model: endpoint,
       input,
     });
 

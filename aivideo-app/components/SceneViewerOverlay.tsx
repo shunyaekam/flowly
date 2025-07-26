@@ -652,12 +652,12 @@ export default function SceneViewerOverlay() {
       <div className="h-full flex pt-20 backdrop-clickable" onClick={handleBackdropClick}>
         {/* Left Panel - Scene Content */}
         <div className={`${rightContent ? 'w-1/2' : 'w-full'} h-full backdrop-clickable relative`} onClick={handleBackdropClick}>
-          {/* Scene Navigation Arrows - positioned relative to content area */}
+          {/* Scene Navigation Arrows - positioned in top corners */}
           {currentSceneIndex > 0 && (
             <button
               onClick={() => navigateToScene('prev')}
               onMouseEnter={() => playSounds.hover()}
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 z-30 text-white/80 hover:text-white transition-colors"
+              className="absolute left-4 top-4 z-30 text-white/80 hover:text-white transition-colors"
             >
               <ChevronLeft className="w-12 h-12" strokeWidth={1} />
             </button>
@@ -667,7 +667,7 @@ export default function SceneViewerOverlay() {
             <button
               onClick={() => navigateToScene('next')}
               onMouseEnter={() => playSounds.hover()}
-              className="absolute right-4 top-1/2 transform -translate-y-1/2 z-30 text-white/80 hover:text-white transition-colors"
+              className="absolute right-4 top-4 z-30 text-white/80 hover:text-white transition-colors"
             >
               <ChevronRight className="w-12 h-12" strokeWidth={1} />
             </button>

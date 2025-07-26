@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`Starting Replicate model run with ${endpoint}...`);
     const prediction = await replicate.predictions.create({
-      version: endpoint,
+      model: endpoint,
       input,
     });
 
