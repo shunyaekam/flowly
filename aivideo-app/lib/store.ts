@@ -18,10 +18,10 @@ export interface Scene {
   selected_image_model?: string;
   selected_video_model?: string;
   selected_audio_model?: string;
-  // Per-scene model parameters (optional - falls back to global settings)
-  image_model_params?: Record<string, unknown>;
-  video_model_params?: Record<string, unknown>;
-  audio_model_params?: Record<string, unknown>;
+  // Per-scene model parameter overrides (only stores customizations)
+  image_model_overrides?: Record<string, unknown>;
+  video_model_overrides?: Record<string, unknown>;
+  audio_model_overrides?: Record<string, unknown>;
 }
 
 export interface StoryboardData {
@@ -69,6 +69,7 @@ export interface AppState {
   // Scene management
   updateScene: (sceneId: string, updates: Partial<Scene>) => void;
   updateScenePosition: (sceneId: string, position: { x: number; y: number }) => void;
+  updateSceneModelOverrides: (sceneId: string, type: 'image' | 'video' | 'audio', overrides: Record<string, unknown>) => void;
   
   // Scene viewer overlay
   editingSceneId: string | null;
@@ -139,23 +140,7 @@ export const storyboardModels = [
   // If OpenAI releases a model with "reasoning" in the name, add it here.
 ];
 
-export const imageModels = [
-  { id: 'seedream', name: 'Seedream' },
-  { id: 'dall-e-3', name: 'DALL-E 3' },
-  { id: 'stable-diffusion', name: 'Stable Diffusion' }
-];
-
-export const videoModels = [
-  { id: 'kling-2.1-pro', name: 'Kling 2.1 Pro' },
-  { id: 'runway-gen2', name: 'Runway Gen-2' },
-  { id: 'pika-labs', name: 'Pika Labs' }
-];
-
-export const audioModels = [
-  { id: 'multi', name: 'Multi' },
-  { id: 'musicgen', name: 'MusicGen' },
-  { id: 'audioldm', name: 'AudioLDM' }
-];
+// Model arrays removed - now using dynamic ModelSelector with real Replicate models
 
 // Import topic prompts from JSON file
 export { TOPIC_PROMPTS } from './prompt-loader';
@@ -173,6 +158,27 @@ Scene 2:
 Image Prompt: "Close-up shot of ancient documents on a dark wooden table, lit by candlelight. High contrast, shallow depth of field, warm color grading."
 Video Prompt: "Camera slowly pans across the documents, revealing hidden details"
 Sound Prompt: "Paper rustling sounds with subtle tension-building ambient music"`;
+
+// Parameter resolution helper
+export function getEffectiveModelParams(
+  type: 'image' | 'video' | 'audio',
+  scene: Scene,
+  settings: Settings
+): Record<string, unknown> {
+  const globalParams = settings[`${type}_model_params` as keyof Settings] as Record<string, unknown> || {};
+  const sceneOverrides = scene[`${type}_model_overrides` as keyof Scene] as Record<string, unknown> || {};
+  return { ...globalParams, ...sceneOverrides };
+}
+
+// Helper to get the effective model ID for a scene
+export function getEffectiveModelId(
+  type: 'image' | 'video' | 'audio',
+  scene: Scene,
+  settings: Settings
+): string {
+  return scene[`selected_${type}_model` as keyof Scene] as string || 
+         settings[`selected_${type}_model` as keyof Settings] as string;
+}
 
 // Persistence helpers
 const STORAGE_KEY = 'aivideo-settings';
@@ -259,9 +265,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     general_prompt: GENERAL_PROMPT,
     mode_prompts: {},
     selected_storyboard_model: 'gpt-4o',
-    selected_image_model: 'seedream',
-    selected_video_model: 'kling-2.1-pro',
-    selected_audio_model: 'multi'
+    selected_image_model: 'fofr/seedream-3',
+    selected_video_model: 'kwaivgi/kling-v2.1',
+    selected_audio_model: 'zsxkib/mmaudio-v2'
   },
   setSettings: (settings) => {
     saveSettingsToStorage(settings);
@@ -296,6 +302,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     
     const scenes = state.storyboardData.scenes.map(scene =>
       scene.id === sceneId ? { ...scene, position } : scene
+    );
+    
+    return {
+      storyboardData: { ...state.storyboardData, scenes }
+    };
+  }),
+
+  updateSceneModelOverrides: (sceneId, type, overrides) => set((state) => {
+    if (!state.storyboardData) return state;
+    
+    const scenes = state.storyboardData.scenes.map(scene =>
+      scene.id === sceneId ? { 
+        ...scene, 
+        [`${type}_model_overrides`]: overrides 
+      } : scene
     );
     
     return {
@@ -402,9 +423,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         ...stored,
         general_prompt: stored.general_prompt || GENERAL_PROMPT,
         selected_storyboard_model: stored.selected_storyboard_model || 'gpt-4o',
-        selected_image_model: stored.selected_image_model || 'seedream',
-        selected_video_model: stored.selected_video_model || 'kling-2.1-pro',
-        selected_audio_model: stored.selected_audio_model || 'multi'
+        selected_image_model: stored.selected_image_model || 'fofr/seedream-3',
+        selected_video_model: stored.selected_video_model || 'kwaivgi/kling-v2.1',
+        selected_audio_model: stored.selected_audio_model || 'zsxkib/mmaudio-v2'
       }
     }));
   },

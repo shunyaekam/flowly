@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAppStore, Scene } from '@/lib/store';
+import { useAppStore, Scene, getEffectiveModelParams } from '@/lib/store';
 import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { generateImage, generateVideo, generateAudio, pollForPrediction } from '@/lib/api';
 import { playSounds } from '@/lib/sounds';
@@ -105,13 +105,13 @@ export default function SceneViewerOverlay() {
         break;
     }
     
-    // Save to scene data immediately
+    // Save to scene data immediately using new override system
     if (currentScene) {
       const sceneUpdateKey = `selected_${type}_model` as keyof Scene;
-      const paramsUpdateKey = `${type}_model_params` as keyof Scene;
+      const overridesUpdateKey = `${type}_model_overrides` as keyof Scene;
       updateScene(currentScene.id, {
         [sceneUpdateKey]: modelId,
-        ...(customParams && Object.keys(customParams).length > 0 ? { [paramsUpdateKey]: customParams } : {})
+        ...(customParams && Object.keys(customParams).length > 0 ? { [overridesUpdateKey]: customParams } : {})
       });
     }
     
@@ -245,8 +245,8 @@ export default function SceneViewerOverlay() {
           if (!settings.replicate_api_key) {
             throw new Error('Please add your Replicate API key in settings');
           }
-          // Get custom parameters for the image model
-          const imageParams = currentScene.image_model_params || settings.image_model_params || {};
+          // Get custom parameters for the image model using new helper
+          const imageParams = getEffectiveModelParams('image', currentScene, settings);
           prediction = await generateImage(imagePrompt, settings.replicate_api_key, selectedImageModel, signal, imageParams);
           
           // Track the prediction ID
@@ -273,8 +273,8 @@ export default function SceneViewerOverlay() {
           if (!currentScene.generated_image) {
             throw new Error('Please generate an image first');
           }
-          // Get custom parameters for the video model
-          const videoParams = currentScene.video_model_params || settings.video_model_params || {};
+          // Get custom parameters for the video model using new helper
+          const videoParams = getEffectiveModelParams('video', currentScene, settings);
           prediction = await generateVideo(videoPrompt, currentScene.generated_image, settings.replicate_api_key, selectedVideoModel, signal, videoParams);
           
           // Track the prediction ID
@@ -301,8 +301,8 @@ export default function SceneViewerOverlay() {
           if (!currentScene.generated_video) {
             throw new Error('Please generate a video first');
           }
-          // Get custom parameters for the audio model
-          const audioParams = currentScene.audio_model_params || settings.audio_model_params || {};
+          // Get custom parameters for the audio model using new helper
+          const audioParams = getEffectiveModelParams('audio', currentScene, settings);
           prediction = await generateAudio(currentScene.generated_video, audioPrompt, settings.replicate_api_key, selectedAudioModel, signal, audioParams);
           
           // Track the prediction ID
