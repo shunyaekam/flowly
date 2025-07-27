@@ -468,7 +468,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       
       {/* Version number */}
       <div className="absolute bottom-4 right-4">
-        <span className="text-white/30 text-xs font-light">v0.8</span>
+        <span className="text-white/30 text-xs font-light">v0.85</span>
       </div>
 
       {/* Model Selectors */}
