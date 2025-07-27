@@ -26,12 +26,23 @@ export interface ReplicateModel {
   };
 }
 
+export interface ParameterSchema {
+  type: string;
+  enum?: unknown[];
+  default?: unknown;
+  description?: string;
+  minimum?: number;
+  maximum?: number;
+  format?: string;
+}
+
 export interface SimpleModelConfig {
   endpoint: string;
   version: string;
   defaultParams: Record<string, unknown>;
   inputMapping: Record<string, string>;
   parameterTypes: Record<string, string>; // Maps parameter names to their expected types
+  parameterSchemas: Record<string, ParameterSchema>; // Full schema information for each parameter
   requiredParams: string[]; // List of required parameter names
 }
 
@@ -70,6 +81,33 @@ export async function searchReplicateModel(modelId: string, apiKey: string): Pro
 }
 
 /**
+ * Get model details directly from Replicate API
+ */
+export async function getReplicateModel(modelId: string, apiKey: string): Promise<ReplicateModel> {
+  console.log(`Fetching Replicate model: ${modelId}`);
+  
+  const response = await fetch(`https://api.replicate.com/v1/models/${modelId}`, {
+    headers: {
+      'Authorization': `Token ${apiKey}`,
+      'Content-Type': 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Replicate API error: ${response.status} ${response.statusText}`);
+  }
+
+  const model = await response.json() as ReplicateModel;
+
+  if (!model.latest_version?.id) {
+    throw new Error(`Model ${modelId} missing version hash`);
+  }
+
+  console.log(`Found model ${modelId} with version ${model.latest_version.id}`);
+  return model;
+}
+
+/**
  * Convert parameter value to the expected type based on schema
  */
 function convertParameterType(value: unknown, expectedType: string): unknown {
@@ -78,8 +116,10 @@ function convertParameterType(value: unknown, expectedType: string): unknown {
   }
 
   switch (expectedType) {
-    case 'number':
     case 'integer':
+      const intVal = typeof value === 'string' ? parseInt(value, 10) : (typeof value === 'number' ? Math.floor(value) : parseInt(String(value), 10));
+      return isNaN(intVal) ? undefined : intVal;
+    case 'number':
       const num = typeof value === 'string' ? parseFloat(value) : (typeof value === 'number' ? value : parseFloat(String(value)));
       return isNaN(num) ? undefined : num;
     case 'boolean':
@@ -105,16 +145,76 @@ function convertParameterType(value: unknown, expectedType: string): unknown {
 }
 
 /**
+ * Resolve a $ref schema reference
+ */
+function resolveSchemaRef(ref: string, allSchemas: Record<string, unknown>): Record<string, unknown> | null {
+  // Handle refs like "#/components/schemas/duration"
+  const parts = ref.split('/');
+  if (parts.length >= 4 && parts[0] === '#' && parts[1] === 'components' && parts[2] === 'schemas') {
+    const schemaName = parts[3];
+    return allSchemas[schemaName] as Record<string, unknown> || null;
+  }
+  return null;
+}
+
+/**
+ * Parse a parameter schema, resolving $ref if needed
+ */
+function parseParameterSchema(
+  paramSchema: Record<string, unknown>, 
+  allSchemas: Record<string, unknown>
+): ParameterSchema {
+  // Handle $ref
+  if (paramSchema.$ref) {
+    const resolved = resolveSchemaRef(String(paramSchema.$ref), allSchemas);
+    if (resolved) {
+      return parseParameterSchema(resolved, allSchemas);
+    }
+  }
+  
+  // Handle allOf (array of schemas to merge)
+  if (paramSchema.allOf && Array.isArray(paramSchema.allOf)) {
+    const merged: Record<string, unknown> = {};
+    for (const subSchema of paramSchema.allOf) {
+      const subSchemaObj = subSchema as Record<string, unknown>;
+      if (subSchemaObj.$ref) {
+        const resolved = resolveSchemaRef(String(subSchemaObj.$ref), allSchemas);
+        if (resolved) {
+          Object.assign(merged, resolved);
+        }
+      } else {
+        Object.assign(merged, subSchemaObj);
+      }
+    }
+    // Apply any direct properties from the original schema
+    Object.assign(merged, { ...paramSchema, allOf: undefined });
+    return parseParameterSchema(merged, allSchemas);
+  }
+
+  return {
+    type: String(paramSchema.type || 'string'),
+    enum: paramSchema.enum as unknown[],
+    default: paramSchema.default,
+    description: String(paramSchema.description || ''),
+    minimum: typeof paramSchema.minimum === 'number' ? paramSchema.minimum : undefined,
+    maximum: typeof paramSchema.maximum === 'number' ? paramSchema.maximum : undefined,
+    format: String(paramSchema.format || '')
+  };
+}
+
+/**
  * Create a simple model config from Replicate model data
  */
 export function createModelConfig(model: ReplicateModel): SimpleModelConfig {
   // Extract schema information
   const schema = model.latest_version?.openapi_schema;
   const inputProps = schema?.components?.schemas?.Input?.properties || {};
+  const allSchemas = schema?.components?.schemas || {};
   const requiredFields = (schema?.components?.schemas?.Input as Record<string, unknown>)?.required as string[] || [];
   
   const defaultParams: Record<string, unknown> = {};
   const parameterTypes: Record<string, string> = {};
+  const parameterSchemas: Record<string, ParameterSchema> = {};
   const requiredParams: string[] = [...requiredFields];
   
   // Find prompt field name and extract schema information
@@ -165,19 +265,18 @@ export function createModelConfig(model: ReplicateModel): SimpleModelConfig {
   });
   
   Object.entries(inputProps).forEach(([key, prop]: [string, unknown]) => {
-    // Store parameter type information
     const propObj = prop as Record<string, unknown>;
-    if (propObj.type) {
-      parameterTypes[key] = String(propObj.type);
-    } else if (propObj.anyOf || propObj.oneOf) {
-      // Handle union types - pick the first one
-      const unionTypes = (propObj.anyOf || propObj.oneOf) as Array<Record<string, unknown>>;
-      parameterTypes[key] = String(unionTypes[0]?.type) || 'string';
-    }
+    
+    // Parse the full parameter schema
+    const paramSchema = parseParameterSchema(propObj, allSchemas);
+    parameterSchemas[key] = paramSchema;
+    parameterTypes[key] = paramSchema.type;
+    
+    console.log(`Parameter ${key}: type=${paramSchema.type}, enum=${paramSchema.enum ? '[' + paramSchema.enum.join(', ') + ']' : 'none'}, default=${paramSchema.default}`);
     
     // Store default values
-    if (propObj.default !== undefined) {
-      defaultParams[key] = propObj.default;
+    if (paramSchema.default !== undefined) {
+      defaultParams[key] = paramSchema.default;
     }
   });
 
@@ -191,6 +290,7 @@ export function createModelConfig(model: ReplicateModel): SimpleModelConfig {
       imageUrl: videoField  // For video generation, this maps to the start image field
     },
     parameterTypes,
+    parameterSchemas,
     requiredParams
   };
 }
@@ -217,8 +317,24 @@ export function processModelParameters(
   // Process and convert custom parameters
   Object.entries(params).forEach(([key, value]) => {
     if (value !== null && value !== undefined && value !== '') {
+      const paramSchema = modelConfig.parameterSchemas[key];
       const expectedType = modelConfig.parameterTypes[key] || 'string';
-      processedParams[key] = convertParameterType(value, expectedType);
+      
+      console.log(`Converting parameter ${key}: ${JSON.stringify(value)} (${typeof value}) -> ${expectedType}`);
+      let convertedValue = convertParameterType(value, expectedType);
+      
+      // Validate enum values if present
+      if (paramSchema?.enum && Array.isArray(paramSchema.enum)) {
+        if (!paramSchema.enum.includes(convertedValue)) {
+          console.warn(`Parameter ${key} value ${JSON.stringify(convertedValue)} not in allowed enum: [${paramSchema.enum.join(', ')}]. Using default.`);
+          convertedValue = paramSchema.default;
+        }
+      }
+      
+      console.log(`Result: ${JSON.stringify(convertedValue)} (${typeof convertedValue})`);
+      if (convertedValue !== undefined) {
+        processedParams[key] = convertedValue;
+      }
     }
   });
   
@@ -242,9 +358,9 @@ export function processModelParameters(
 }
 
 /**
- * Get model config directly from Replicate (combines search + config creation)
+ * Get model config directly from Replicate (combines fetch + config creation)
  */
 export async function getModelConfig(modelId: string, apiKey: string): Promise<SimpleModelConfig> {
-  const model = await searchReplicateModel(modelId, apiKey);
+  const model = await getReplicateModel(modelId, apiKey);
   return createModelConfig(model);
 }

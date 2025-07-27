@@ -17,7 +17,7 @@ import {
   Connection,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useAppStore, Scene } from '@/lib/store';
+import { useAppStore, Scene, getEffectiveModelParams, getEffectiveModelId } from '@/lib/store';
 import { ArrowLeft, ChevronDown } from 'lucide-react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import SettingsModal from '@/components/SettingsModal';
@@ -554,7 +554,10 @@ function StoryboardFlow() {
             
             switch (type) {
               case 'images':
-                prediction = await generateImage(scene.scene_image_prompt, settings.replicate_api_key, settings.selected_image_model, signal);
+                // Get custom parameters for the image model using new helper
+                const imageParams = getEffectiveModelParams('image', scene, settings);
+                const selectedImageModel = getEffectiveModelId('image', scene, settings);
+                prediction = await generateImage(scene.scene_image_prompt, settings.replicate_api_key, selectedImageModel, signal, imageParams);
                 
                 // Track the prediction ID
                 setActivePredictions(prev => {
@@ -574,7 +577,10 @@ function StoryboardFlow() {
                 
               case 'videos':
                 if (scene.generated_image) {
-                  prediction = await generateVideo(scene.scene_video_prompt, scene.generated_image, settings.replicate_api_key, settings.selected_video_model, signal);
+                  // Get custom parameters for the video model using new helper
+                  const videoParams = getEffectiveModelParams('video', scene, settings);
+                  const selectedVideoModel = getEffectiveModelId('video', scene, settings);
+                  prediction = await generateVideo(scene.scene_video_prompt, scene.generated_image, settings.replicate_api_key, selectedVideoModel, signal, videoParams);
                   
                   // Track the prediction ID
                   setActivePredictions(prev => {
@@ -595,7 +601,10 @@ function StoryboardFlow() {
                 
               case 'sounds':
                 if (scene.generated_video) {
-                  prediction = await generateAudio(scene.generated_video, scene.scene_sound_prompt, settings.replicate_api_key, settings.selected_audio_model, signal);
+                  // Get custom parameters for the audio model using new helper
+                  const audioParams = getEffectiveModelParams('audio', scene, settings);
+                  const selectedAudioModel = getEffectiveModelId('audio', scene, settings);
+                  prediction = await generateAudio(scene.generated_video, scene.scene_sound_prompt, settings.replicate_api_key, selectedAudioModel, signal, audioParams);
                   
                   // Track the prediction ID
                   setActivePredictions(prev => {

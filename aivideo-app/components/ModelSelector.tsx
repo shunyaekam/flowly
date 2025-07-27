@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { X, Search, ChevronDown, ChevronUp } from 'lucide-react';
-import { useAppStore, Scene } from '@/lib/store';
+import { useAppStore, getEffectiveModelParams, getEffectiveModelId } from '@/lib/store';
 import { playSounds } from '@/lib/sounds';
 
 interface ModelSelectorProps {
@@ -57,15 +57,22 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
   const [showParameters, setShowParameters] = useState(false);
   const [editableParams, setEditableParams] = useState<Record<string, unknown>>({});
 
-  // Get currently selected model ID
+  // Get currently selected model ID and parameters
   const getCurrentModelId = () => {
     if (sceneId) {
-      // Scene-specific model selection
       const scene = storyboardData?.scenes.find(s => s.id === sceneId);
-      return scene?.[`selected_${type}_model` as keyof Scene] as string || settings[`selected_${type}_model` as keyof typeof settings] as string;
+      return scene ? getEffectiveModelId(type, scene, settings) : settings[`selected_${type}_model` as keyof typeof settings] as string;
     } else {
-      // Global model selection
       return settings[`selected_${type}_model` as keyof typeof settings] as string;
+    }
+  };
+
+  const getCurrentParams = () => {
+    if (sceneId) {
+      const scene = storyboardData?.scenes.find(s => s.id === sceneId);
+      return scene ? getEffectiveModelParams(type, scene, settings) : settings[`${type}_model_params` as keyof typeof settings] as Record<string, unknown> || {};
+    } else {
+      return settings[`${type}_model_params` as keyof typeof settings] as Record<string, unknown> || {};
     }
   };
 
@@ -424,19 +431,8 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
         console.log('Auto-selecting current model:', currentModelId);
         setSelectedModel(currentModel);
         
-        // Load existing parameters from settings/scene
-        let existingParams: Record<string, unknown> = {};
-        
-        if (sceneId) {
-          // Load scene-specific parameters
-          const scene = storyboardData?.scenes.find(s => s.id === sceneId);
-          const paramsKey = `${type}_model_params` as keyof Scene;
-          existingParams = scene?.[paramsKey] as Record<string, unknown> || {};
-        } else {
-          // Load global parameters
-          const paramsKey = `${type}_model_params` as keyof typeof settings;
-          existingParams = settings[paramsKey] as Record<string, unknown> || {};
-        }
+        // Load existing parameters using new helper function
+        const existingParams = getCurrentParams();
         
         // Initialize parameters with existing values or defaults
         const schema = currentModel.latest_version?.openapi_schema;
@@ -481,8 +477,28 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
     if (selectedModel) {
       const modelId = `${selectedModel.owner}/${selectedModel.name}`;
       console.log('Selecting model:', modelId, 'with params:', editableParams);
-      // Pass model ID and custom parameters
-      onModelSelect(modelId, editableParams);
+      
+      // For scene selection, calculate overrides (differences from global)
+      // For global selection, pass all parameters
+      let finalParams = editableParams;
+      
+      if (sceneId) {
+        // Calculate only the differences from global settings as overrides
+        const globalParams = settings[`${type}_model_params` as keyof typeof settings] as Record<string, unknown> || {};
+        const overrides: Record<string, unknown> = {};
+        
+        Object.entries(editableParams).forEach(([key, value]) => {
+          if (globalParams[key] !== value) {
+            overrides[key] = value;
+          }
+        });
+        
+        finalParams = overrides;
+        console.log('Scene overrides calculated:', overrides);
+      }
+      
+      // Pass model ID and parameters (full params for global, overrides for scene)
+      onModelSelect(modelId, finalParams);
       playSounds.ok(); // Success sound
       onClose();
     }
@@ -686,7 +702,60 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
                           {/* Editable Input */}
                           {key !== 'prompt' && ( // Skip prompt as it's handled separately
                             <div>
-                              {(prop as Record<string, unknown>).type === 'boolean' ? (
+                              {/* Check for enum values first */}
+                              {(() => {
+                                const propObj = prop as Record<string, unknown>;
+                                // Check for direct enum
+                                if (propObj.enum && Array.isArray(propObj.enum)) {
+                                  return (
+                                    <select
+                                      value={editableParams[key] !== undefined ? String(editableParams[key]) : String(propObj.default || propObj.enum[0])}
+                                      onChange={(e) => setEditableParams(prev => ({
+                                        ...prev,
+                                        [key]: propObj.type === 'integer' ? parseInt(e.target.value) : e.target.value
+                                      }))}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="w-full px-2 py-1 bg-white/10 border border-white/20 text-white text-sm rounded focus:outline-none focus:border-white/40"
+                                    >
+                                      {propObj.enum.map((value: unknown) => (
+                                        <option key={String(value)} value={String(value)} className="bg-gray-800">
+                                          {String(value)}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  );
+                                }
+                                // Check for allOf with $ref (like aspect_ratio, duration)
+                                if (propObj.allOf && Array.isArray(propObj.allOf) && selectedModel.latest_version?.openapi_schema?.components?.schemas) {
+                                  const ref = propObj.allOf[0] as Record<string, unknown>;
+                                  if (ref.$ref && typeof ref.$ref === 'string') {
+                                    const refName = ref.$ref.split('/').pop();
+                                    const schemas = selectedModel.latest_version.openapi_schema.components.schemas as Record<string, unknown>;
+                                    const refSchema = refName ? schemas[refName] as Record<string, unknown> : null;
+                                    if (refSchema?.enum && Array.isArray(refSchema.enum)) {
+                                      return (
+                                        <select
+                                          value={editableParams[key] !== undefined ? String(editableParams[key]) : String(propObj.default || refSchema.enum[0])}
+                                          onChange={(e) => setEditableParams(prev => ({
+                                            ...prev,
+                                            [key]: refSchema.type === 'integer' ? parseInt(e.target.value) : e.target.value
+                                          }))}
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="w-full px-2 py-1 bg-white/10 border border-white/20 text-white text-sm rounded focus:outline-none focus:border-white/40"
+                                        >
+                                          {refSchema.enum.map((value: unknown) => (
+                                            <option key={String(value)} value={String(value)} className="bg-gray-800">
+                                              {String(value)}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      );
+                                    }
+                                  }
+                                }
+                                // Fall back to existing logic
+                                return null;
+                              })() || ((prop as Record<string, unknown>).type === 'boolean' ? (
                                 <select
                                   value={editableParams[key] !== undefined ? String(editableParams[key]) : String((prop as Record<string, unknown>).default || false)}
                                   onChange={(e) => setEditableParams(prev => ({
@@ -722,7 +791,7 @@ export default function ModelSelector({ isOpen, onClose, type, sceneId, onModelS
                                   onClick={(e) => e.stopPropagation()}
                                   className="w-full px-2 py-1 bg-white/10 border border-white/20 text-white text-sm rounded focus:outline-none focus:border-white/40"
                                 />
-                              )}
+                              ))}
                               <p className="text-white/40 text-xs mt-1">
                                 default: {String((prop as Record<string, unknown>).default)}
                               </p>
