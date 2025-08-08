@@ -22,6 +22,26 @@ export interface Scene {
   image_model_overrides?: Record<string, unknown>;
   video_model_overrides?: Record<string, unknown>;
   audio_model_overrides?: Record<string, unknown>;
+  
+  // Local blob caching for URL expiration handling
+  cached_image_blob?: Blob;
+  cached_video_blob?: Blob;
+  cached_sound_blob?: Blob;
+  
+  // URL expiration tracking
+  image_url_expires?: Date;
+  video_url_expires?: Date;
+  sound_url_expires?: Date;
+  
+  // Custom content upload support
+  custom_image_uploaded?: boolean;
+  custom_video_uploaded?: boolean;
+  custom_image_url?: string; // Data URL for immediate display
+  custom_video_url?: string; // Data URL for immediate display  
+  custom_image_replicate_url?: string; // Proxy URL for generation
+  custom_video_replicate_url?: string; // Proxy URL for generation
+  image_source: 'generated' | 'uploaded';
+  video_source: 'generated' | 'uploaded';
 }
 
 export interface StoryboardData {
@@ -70,6 +90,10 @@ export interface AppState {
   updateScene: (sceneId: string, updates: Partial<Scene>) => void;
   updateScenePosition: (sceneId: string, position: { x: number; y: number }) => void;
   updateSceneModelOverrides: (sceneId: string, type: 'image' | 'video' | 'audio', overrides: Record<string, unknown>) => void;
+  
+  // Blob caching and URL expiration management
+  updateSceneCache: (sceneId: string, type: 'image' | 'video' | 'sound', blob: Blob, url?: string, expiresAt?: Date) => void;
+  updateSceneCustomContent: (sceneId: string, type: 'image' | 'video', displayUrl: string, replicateUrl: string, blob: Blob, expiresAt: Date) => void;
   
   // Scene viewer overlay
   editingSceneId: string | null;
@@ -180,6 +204,50 @@ export function getEffectiveModelId(
          settings[`selected_${type}_model` as keyof Settings] as string;
 }
 
+// URL expiration utilities
+export function isUrlExpired(expirationDate?: Date): boolean {
+  return expirationDate ? new Date() >= expirationDate : true;
+}
+
+export function willExpireSoon(expirationDate?: Date, minutesThreshold: number = 10): boolean {
+  if (!expirationDate) return true;
+  const threshold = new Date(Date.now() + minutesThreshold * 60 * 1000);
+  return expirationDate <= threshold;
+}
+
+// Smart URL resolution for content with expiration handling
+export function getEffectiveContentUrl(scene: Scene, type: 'image' | 'video' | 'sound'): string | null {
+  // Priority 1: Custom uploaded content (24h expiration)  
+  if (type !== 'sound') { // Sound doesn't support custom uploads
+    const customUrl = scene[`custom_${type}_url` as keyof Scene] as string;
+    const isCustomUploaded = scene[`custom_${type}_uploaded` as keyof Scene] as boolean;
+    
+    if (isCustomUploaded && customUrl) {
+      const expiresAt = scene[`${type}_url_expires` as keyof Scene] as Date;
+      if (!isUrlExpired(expiresAt)) {
+        return customUrl;
+      }
+    }
+  }
+  
+  // Priority 2: Generated content URL (1h expiration)
+  const generatedUrl = scene[`generated_${type}` as keyof Scene] as string;
+  if (generatedUrl) {
+    const expiresAt = scene[`${type}_url_expires` as keyof Scene] as Date;
+    if (!isUrlExpired(expiresAt)) {
+      return generatedUrl;
+    }
+  }
+  
+  // No valid URL available
+  return null;
+}
+
+// Get cached blob when URL is expired
+export function getCachedBlob(scene: Scene, type: 'image' | 'video' | 'sound'): Blob | null {
+  return scene[`cached_${type}_blob` as keyof Scene] as Blob || null;
+}
+
 // Persistence helpers
 const STORAGE_KEY = 'aivideo-settings';
 
@@ -251,7 +319,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         id: scene.id || `scene-${index}`,
         image_generated: scene.image_generated || false,
         video_generated: scene.video_generated || false,
-        sound_generated: scene.sound_generated || false
+        sound_generated: scene.sound_generated || false,
+        image_source: scene.image_source || 'generated',
+        video_source: scene.video_source || 'generated'
       };
     });
     
@@ -316,6 +386,44 @@ export const useAppStore = create<AppState>((set, get) => ({
       scene.id === sceneId ? { 
         ...scene, 
         [`${type}_model_overrides`]: overrides 
+      } : scene
+    );
+    
+    return {
+      storyboardData: { ...state.storyboardData, scenes }
+    };
+  }),
+
+  // Blob caching and URL expiration management
+  updateSceneCache: (sceneId: string, type: 'image' | 'video' | 'sound', blob: Blob, url?: string, expiresAt?: Date) => set((state) => {
+    if (!state.storyboardData) return state;
+    
+    const scenes = state.storyboardData.scenes.map(scene =>
+      scene.id === sceneId ? {
+        ...scene,
+        [`cached_${type}_blob`]: blob,
+        [`${type}_url_expires`]: expiresAt,
+        ...(url && { [`generated_${type}`]: url })
+      } : scene
+    );
+    
+    return {
+      storyboardData: { ...state.storyboardData, scenes }
+    };
+  }),
+
+  updateSceneCustomContent: (sceneId: string, type: 'image' | 'video', displayUrl: string, replicateUrl: string, blob: Blob, expiresAt: Date) => set((state) => {
+    if (!state.storyboardData) return state;
+    
+    const scenes = state.storyboardData.scenes.map(scene =>
+      scene.id === sceneId ? {
+        ...scene,
+        [`custom_${type}_uploaded`]: true,
+        [`custom_${type}_url`]: displayUrl, // Data URL for display
+        [`custom_${type}_replicate_url`]: replicateUrl, // Proxy URL for generation
+        [`cached_${type}_blob`]: blob,
+        [`${type}_url_expires`]: expiresAt,
+        [`${type}_source`]: 'uploaded' as const
       } : scene
     );
     

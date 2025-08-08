@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAppStore, Scene, getEffectiveModelParams } from '@/lib/store';
-import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
-import { generateImage, generateVideo, generateAudio, pollForPrediction } from '@/lib/api';
+import { RefreshCw, ChevronLeft, ChevronRight, Upload } from 'lucide-react';
+import { generateImage, generateVideo, generateAudio, pollForPrediction, uploadAndCacheFile, cacheGeneratedContent } from '@/lib/api';
 import { playSounds } from '@/lib/sounds';
 import ModelSelector from './ModelSelector';
 
@@ -21,6 +21,8 @@ export default function SceneViewerOverlay() {
     cancelGeneration,
     generationCancellation,
     visualSceneOrder,
+    updateSceneCustomContent,
+    updateSceneCache,
   } = useAppStore();
   
   // Find the current scene being edited
@@ -41,6 +43,12 @@ export default function SceneViewerOverlay() {
   const [showCancelDialog, setShowCancelDialog] = useState<'image' | 'video' | 'audio' | null>(null);
   const [activePredictions, setActivePredictions] = useState<Map<string, string>>(new Map()); // Map scene-type to prediction ID
   const [modelSelectorOpen, setModelSelectorOpen] = useState<'image' | 'video' | 'audio' | null>(null);
+  
+  // Upload functionality state
+  const [uploading, setUploading] = useState<'image' | 'video' | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<string>('');
+  const imageFileRef = useRef<HTMLInputElement>(null);
+  const videoFileRef = useRef<HTMLInputElement>(null);
   
   // Initialize local state when scene changes
   useEffect(() => {
@@ -168,6 +176,15 @@ export default function SceneViewerOverlay() {
   
   // Don't render if no scene is being edited
   if (!editingSceneId || !currentScene) return null;
+
+  // Define effective URLs at component level for reuse
+  const effectiveImageUrl = currentScene.custom_image_uploaded && currentScene.custom_image_url 
+    ? currentScene.custom_image_url 
+    : currentScene.generated_image;
+    
+  const effectiveVideoUrl = currentScene.custom_video_uploaded && currentScene.custom_video_url 
+    ? currentScene.custom_video_url 
+    : currentScene.generated_video;
   
   // Handle cancellation
   const handleCancelGeneration = async (type: 'image' | 'video' | 'audio') => {
@@ -262,6 +279,10 @@ export default function SceneViewerOverlay() {
               generated_image: result,
               image_generated: true
             });
+            
+            // Automatically cache the generated content
+            await cacheGeneratedContent(result, currentScene.id, 'image', updateSceneCache);
+            
             playSounds.ok(); // Success sound
           }
           break;
@@ -270,12 +291,19 @@ export default function SceneViewerOverlay() {
           if (!settings.replicate_api_key) {
             throw new Error('Please add your Replicate API key in settings');
           }
-          if (!currentScene.generated_image) {
-            throw new Error('Please generate an image first');
+          
+          // For generation, use the Replicate proxy URL, not the data URL
+          const imageUrl = currentScene.custom_image_uploaded && currentScene.custom_image_replicate_url
+            ? currentScene.custom_image_replicate_url 
+            : currentScene.generated_image;
+            
+          if (!imageUrl) {
+            throw new Error('Please generate or upload an image first');
           }
+          
           // Get custom parameters for the video model using new helper
           const videoParams = getEffectiveModelParams('video', currentScene, settings);
-          prediction = await generateVideo(videoPrompt, currentScene.generated_image, settings.replicate_api_key, selectedVideoModel, signal, videoParams);
+          prediction = await generateVideo(videoPrompt, imageUrl, settings.replicate_api_key, selectedVideoModel, signal, videoParams);
           
           // Track the prediction ID
           setActivePredictions(prev => {
@@ -290,6 +318,10 @@ export default function SceneViewerOverlay() {
               generated_video: result,
               video_generated: true
             });
+            
+            // Automatically cache the generated content
+            await cacheGeneratedContent(result, currentScene.id, 'video', updateSceneCache);
+            
             playSounds.ok(); // Success sound
           }
           break;
@@ -298,12 +330,19 @@ export default function SceneViewerOverlay() {
           if (!settings.replicate_api_key) {
             throw new Error('Please add your Replicate API key in settings');
           }
-          if (!currentScene.generated_video) {
-            throw new Error('Please generate a video first');
+          
+          // For generation, use the Replicate proxy URL, not the data URL
+          const videoUrl = currentScene.custom_video_uploaded && currentScene.custom_video_replicate_url
+            ? currentScene.custom_video_replicate_url 
+            : currentScene.generated_video;
+            
+          if (!videoUrl) {
+            throw new Error('Please generate or upload a video first');
           }
+          
           // Get custom parameters for the audio model using new helper
           const audioParams = getEffectiveModelParams('audio', currentScene, settings);
-          prediction = await generateAudio(currentScene.generated_video, audioPrompt, settings.replicate_api_key, selectedAudioModel, signal, audioParams);
+          prediction = await generateAudio(videoUrl, audioPrompt, settings.replicate_api_key, selectedAudioModel, signal, audioParams);
           
           // Track the prediction ID
           setActivePredictions(prev => {
@@ -318,6 +357,10 @@ export default function SceneViewerOverlay() {
               generated_sound: result,
               sound_generated: true
             });
+            
+            // Automatically cache the generated content
+            await cacheGeneratedContent(result, currentScene.id, 'sound', updateSceneCache);
+            
             playSounds.ok(); // Success sound
           }
           break;
@@ -341,6 +384,63 @@ export default function SceneViewerOverlay() {
         return newMap;
       });
     }
+  };
+
+  // Handle file upload
+  const handleUpload = async (type: 'image' | 'video') => {
+    if (!currentScene || !settings.replicate_api_key) {
+      alert('Please add your Replicate API key in settings');
+      return;
+    }
+
+    const fileRef = type === 'image' ? imageFileRef : videoFileRef;
+    const file = fileRef.current?.files?.[0];
+    
+    if (!file) {
+      return;
+    }
+
+    setUploading(type);
+    setUploadProgress('Uploading to Replicate...');
+
+    try {
+      await uploadAndCacheFile(
+        file,
+        currentScene.id,
+        type,
+        settings.replicate_api_key,
+        updateSceneCustomContent
+      );
+
+      // Update scene flags
+      updateScene(currentScene.id, {
+        [`${type}_generated`]: true,
+        [`${type}_source`]: 'uploaded'
+      });
+
+      setUploadProgress('Upload complete!');
+      playSounds.ok();
+      
+      // Clear the file input
+      if (fileRef.current) {
+        fileRef.current.value = '';
+      }
+
+    } catch (error) {
+      console.error(`${type} upload failed:`, error);
+      setUploadProgress('Upload failed');
+      playSounds.error();
+      alert(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setUploading(null);
+      setTimeout(() => setUploadProgress(''), 3000);
+    }
+  };
+
+  // Trigger file selection
+  const triggerFileSelect = (type: 'image' | 'video') => {
+    const fileRef = type === 'image' ? imageFileRef : videoFileRef;
+    fileRef.current?.click();
   };
   
   // Render content based on selected tab
@@ -381,12 +481,32 @@ export default function SceneViewerOverlay() {
       case 'image':
         return (
           <div className="h-full flex items-center justify-center p-12">
-            {currentScene.generated_image ? (
-              <img 
-                src={currentScene.generated_image} 
-                alt="Generated scene"
-                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-              />
+            {effectiveImageUrl ? (
+              <div 
+                className="relative max-w-full max-h-full cursor-pointer group"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerFileSelect('image');
+                }}
+                title="Click to upload a new image"
+              >
+                <img 
+                  src={effectiveImageUrl} 
+                  alt={currentScene.custom_image_uploaded ? "Uploaded image" : "Generated scene"} 
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-2xl transition-opacity group-hover:opacity-80"
+                />
+                {currentScene.custom_image_uploaded && (
+                  <div className="absolute top-2 left-2 bg-black/50 backdrop-blur-sm rounded px-2 py-1 text-xs text-white/80">
+                    uploaded
+                  </div>
+                )}
+                {/* Upload overlay on hover */}
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-lg">
+                  <div className="bg-black/60 backdrop-blur-sm rounded-full px-4 py-2">
+                    <span className="text-white text-sm font-light">upload</span>
+                  </div>
+                </div>
+              </div>
             ) : (
               <div className="flex items-center justify-center">
                 <p className="text-white/70 text-lg font-light">No image yet...</p>
@@ -398,12 +518,33 @@ export default function SceneViewerOverlay() {
       case 'video':
         return (
           <div className="h-full flex items-center justify-center p-12">
-            {currentScene.generated_video ? (
-              <video 
-                src={currentScene.generated_video} 
-                controls
-                className="max-w-full max-h-full rounded-lg shadow-2xl"
-              />
+            {effectiveVideoUrl ? (
+              <div 
+                className="relative max-w-full max-h-full cursor-pointer group"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerFileSelect('video');
+                }}
+                title="Click to upload a new video"
+              >
+                <video 
+                  src={effectiveVideoUrl} 
+                  controls
+                  className="max-w-full max-h-full rounded-lg shadow-2xl transition-opacity group-hover:opacity-80"
+                  onClick={(e) => e.stopPropagation()} // Don't trigger upload when clicking video controls
+                />
+                {currentScene.custom_video_uploaded && (
+                  <div className="absolute top-2 left-2 bg-black/50 backdrop-blur-sm rounded px-2 py-1 text-xs text-white/80">
+                    uploaded
+                  </div>
+                )}
+                {/* Upload overlay on hover (only when not hovering over controls) */}
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-lg pointer-events-none">
+                  <div className="bg-black/60 backdrop-blur-sm rounded-full px-4 py-2">
+                    <span className="text-white text-sm font-light">upload</span>
+                  </div>
+                </div>
+              </div>
             ) : (
               <div className="flex items-center justify-center">
                 <p className="text-white/70 text-lg font-light">No video yet...</p>
@@ -468,22 +609,54 @@ export default function SceneViewerOverlay() {
                 </button>
               </div>
               
-              <button
-                onClick={() => handleGenerate('image')}
-                onMouseEnter={() => !getSceneGenerationState(currentScene.id, 'image') && playSounds.hover()}
-                className="w-full py-3 text-white hover:text-white/80 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
-              >
-                {getSceneGenerationState(currentScene.id, 'image') ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : currentScene.generated_image ? (
-                  're-generate'
-                ) : (
-                  'generate'
+              <div className="space-y-3">
+                <button
+                  onClick={() => handleGenerate('image')}
+                  onMouseEnter={() => !getSceneGenerationState(currentScene.id, 'image') && playSounds.hover()}
+                  className="w-full py-3 text-white hover:text-white/80 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+                >
+                  {getSceneGenerationState(currentScene.id, 'image') ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : currentScene.generated_image ? (
+                    're-generate'
+                  ) : (
+                    'generate'
+                  )}
+                </button>
+                
+                {!effectiveImageUrl && (
+                  <div className="flex items-center gap-3 text-white/50 text-xs">
+                    <div className="flex-1 h-px bg-white/20"></div>
+                    <span>or</span>
+                    <div className="flex-1 h-px bg-white/20"></div>
+                  </div>
                 )}
-              </button>
+                
+                {!effectiveImageUrl && (
+                  <button
+                    onClick={() => triggerFileSelect('image')}
+                    onMouseEnter={() => !uploading && playSounds.hover()}
+                    disabled={uploading === 'image'}
+                    className="w-full py-3 text-white hover:text-white/80 transition-colors flex items-center justify-center text-sm font-medium disabled:opacity-50"
+                  >
+                    {uploading === 'image' ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                        Uploading...
+                      </>
+                    ) : (
+                      'upload'
+                    )}
+                  </button>
+                )}
+                
+                {uploadProgress && uploading === 'image' && (
+                  <p className="text-center text-xs text-white/60">{uploadProgress}</p>
+                )}
+              </div>
             </div>
           </div>
         );
@@ -517,22 +690,54 @@ export default function SceneViewerOverlay() {
                 </button>
               </div>
               
-              <button
-                onClick={() => handleGenerate('video')}
-                onMouseEnter={() => !getSceneGenerationState(currentScene.id, 'video') && playSounds.hover()}
-                className="w-full py-3 text-white hover:text-white/80 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
-              >
-                {getSceneGenerationState(currentScene.id, 'video') ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : currentScene.generated_video ? (
-                  're-generate'
-                ) : (
-                  'generate'
+              <div className="space-y-3">
+                <button
+                  onClick={() => handleGenerate('video')}
+                  onMouseEnter={() => !getSceneGenerationState(currentScene.id, 'video') && playSounds.hover()}
+                  className="w-full py-3 text-white hover:text-white/80 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+                >
+                  {getSceneGenerationState(currentScene.id, 'video') ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : currentScene.generated_video ? (
+                    're-generate'
+                  ) : (
+                    'generate'
+                  )}
+                </button>
+                
+                {!effectiveVideoUrl && (
+                  <div className="flex items-center gap-3 text-white/50 text-xs">
+                    <div className="flex-1 h-px bg-white/20"></div>
+                    <span>or</span>
+                    <div className="flex-1 h-px bg-white/20"></div>
+                  </div>
                 )}
-              </button>
+                
+                {!effectiveVideoUrl && (
+                  <button
+                    onClick={() => triggerFileSelect('video')}
+                    onMouseEnter={() => !uploading && playSounds.hover()}
+                    disabled={uploading === 'video'}
+                    className="w-full py-3 text-white hover:text-white/80 transition-colors flex items-center justify-center text-sm font-medium disabled:opacity-50"
+                  >
+                    {uploading === 'video' ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                        Uploading...
+                      </>
+                    ) : (
+                      'upload'
+                    )}
+                  </button>
+                )}
+                
+                {uploadProgress && uploading === 'video' && (
+                  <p className="text-center text-xs text-white/60">{uploadProgress}</p>
+                )}
+              </div>
             </div>
           </div>
         );
@@ -730,6 +935,22 @@ export default function SceneViewerOverlay() {
         type="audio"
         sceneId={editingSceneId || undefined}
         onModelSelect={handleModelSelect}
+      />
+      
+      {/* Hidden file inputs */}
+      <input
+        ref={imageFileRef}
+        type="file"
+        accept="image/png,image/jpeg,image/jpg,image/webp"
+        style={{ display: 'none' }}
+        onChange={() => handleUpload('image')}
+      />
+      <input
+        ref={videoFileRef}
+        type="file"
+        accept="video/mp4,video/mov,video/quicktime"
+        style={{ display: 'none' }}
+        onChange={() => handleUpload('video')}
       />
     </div>
   );

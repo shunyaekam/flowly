@@ -22,7 +22,7 @@ import { ArrowLeft, ChevronDown } from 'lucide-react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import SettingsModal from '@/components/SettingsModal';
 import SceneViewerOverlay from '@/components/SceneViewerOverlay';
-import { generateImage, generateVideo, generateAudio, saveProject, pollForPrediction } from '@/lib/api';
+import { generateImage, generateVideo, generateAudio, saveProject, pollForPrediction, cacheGeneratedContent } from '@/lib/api';
 import { playSounds } from '@/lib/sounds';
 
 // Custom node component for storyboard scene cards
@@ -198,7 +198,7 @@ function getFlowSequence(scenes: Scene[], edges: Edge[]): Scene[] {
 }
 
 function StoryboardFlow() {
-  const { storyboardData, setCurrentView, updateScenePosition, updateScene, settings, setSceneGenerationState, generationCancellation, getSceneGenerationState, cancelGeneration, setVisualSceneOrder, generateAllCancelled, setGenerateAllCancelled } = useAppStore();
+  const { storyboardData, setCurrentView, updateScenePosition, updateScene, settings, setSceneGenerationState, generationCancellation, getSceneGenerationState, cancelGeneration, setVisualSceneOrder, generateAllCancelled, setGenerateAllCancelled, updateSceneCache } = useAppStore();
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [showRegenerateDialog, setShowRegenerateDialog] = useState<'images' | 'videos' | 'sounds' | null>(null);
@@ -572,6 +572,9 @@ function StoryboardFlow() {
                     generated_image: result,
                     image_generated: true
                   });
+                  
+                  // Automatically cache the generated content
+                  await cacheGeneratedContent(result, scene.id, 'image', updateSceneCache);
                 }
                 break;
                 
@@ -595,6 +598,9 @@ function StoryboardFlow() {
                       generated_video: result,
                       video_generated: true
                     });
+                    
+                    // Automatically cache the generated content
+                    await cacheGeneratedContent(result, scene.id, 'video', updateSceneCache);
                   }
                 }
                 break;
@@ -619,6 +625,9 @@ function StoryboardFlow() {
                       generated_sound: result,
                       sound_generated: true
                     });
+                    
+                    // Automatically cache the generated content
+                    await cacheGeneratedContent(result, scene.id, 'sound', updateSceneCache);
                   }
                 }
                 break;

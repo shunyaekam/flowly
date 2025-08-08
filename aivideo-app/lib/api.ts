@@ -380,9 +380,119 @@ export async function downloadFile(url: string): Promise<Blob> {
   return response.blob();
 }
 
+// Enhanced download with automatic caching
+export async function downloadAndCache(
+  url: string, 
+  sceneId: string, 
+  type: 'image' | 'video' | 'sound', 
+  updateSceneCache: (sceneId: string, type: 'image' | 'video' | 'sound', blob: Blob, url?: string, expiresAt?: Date) => void,
+  expiresAt?: Date
+): Promise<Blob> {
+  const blob = await downloadFile(url);
+  
+  // Cache the blob in the store
+  updateSceneCache(sceneId, type, blob, url, expiresAt);
+  
+  return blob;
+}
+
+// Cache content after successful generation
+export async function cacheGeneratedContent(
+  url: string,
+  sceneId: string,
+  type: 'image' | 'video' | 'sound',
+  updateSceneCache: (sceneId: string, type: 'image' | 'video' | 'sound', blob: Blob, url?: string, expiresAt?: Date) => void,
+  isCustomUpload = false
+): Promise<void> {
+  try {
+    // Set expiration based on content type
+    const expirationTime = isCustomUpload 
+      ? 24 * 60 * 60 * 1000  // 24 hours for uploads
+      : 60 * 60 * 1000;      // 1 hour for API generations
+    
+    const expiresAt = new Date(Date.now() + expirationTime);
+    
+    // Download and cache the content
+    await downloadAndCache(url, sceneId, type, updateSceneCache, expiresAt);
+    
+    console.log(`Cached ${type} content for scene ${sceneId}, expires at:`, expiresAt);
+  } catch (error) {
+    console.error(`Failed to cache ${type} content for scene ${sceneId}:`, error);
+  }
+}
+
+// Upload file to Replicate with caching
+export interface UploadResult {
+  id: string;
+  url: string;
+  filename: string;
+  size: number;
+  type: string;
+  expiresAt: string;
+}
+
+export async function uploadFile(
+  file: File, 
+  apiKey: string, 
+  signal?: AbortSignal
+): Promise<UploadResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('apiKey', apiKey);
+
+  const response = await fetch('/api/upload', {
+    method: 'POST',
+    body: formData,
+    signal
+  });
+
+  if (!response.ok) {
+    let errorMessage = `Upload failed: ${response.status} ${response.statusText}`;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.error || errorMessage;
+    } catch {
+      // Failed to parse JSON error
+    }
+    throw new Error(errorMessage);
+  }
+
+  return await response.json();
+}
+
+// Upload and cache file in one operation
+export async function uploadAndCacheFile(
+  file: File,
+  sceneId: string,
+  type: 'image' | 'video',
+  apiKey: string,
+  updateSceneCustomContent: (sceneId: string, type: 'image' | 'video', displayUrl: string, replicateUrl: string, blob: Blob, expiresAt: Date) => void,
+  signal?: AbortSignal
+): Promise<UploadResult> {
+  // Upload to Replicate
+  const uploadResult = await uploadFile(file, apiKey, signal);
+  
+  // For immediate display, create a data URL from the file
+  const dataUrl = await new Promise<string>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.readAsDataURL(file);
+  });
+  
+  // Create blob from file for caching  
+  const blob = new Blob([file], { type: file.type });
+  const expiresAt = new Date(uploadResult.expiresAt);
+  
+  // Cache in store with both URLs
+  updateSceneCustomContent(sceneId, type, dataUrl, uploadResult.url, blob, expiresAt);
+  
+  // Return the original upload result but with data URL for display
+  return { ...uploadResult, displayUrl: dataUrl };
+}
 
 
-// Save project files
+
+// Save project files with URL expiration handling
 export async function saveProject(storyboard: StoryboardData, scenes: Scene[]): Promise<void> {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const projectName = `aivideo_${timestamp}`;
@@ -405,32 +515,113 @@ export async function saveProject(storyboard: StoryboardData, scenes: Scene[]): 
     zip.file('original_prompt.txt', storyboard.originalPrompt);
   }
   
-  // Download and add media files
+  const exportErrors: string[] = [];
+  
+  // Download and add media files with fallback to cached blobs
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
     const sceneName = safeFilename(scene.scene);
     
+    // Helper function to get content with fallback
+    const getContentBlob = async (
+      type: 'image' | 'video' | 'sound',
+      customUrl?: string,
+      generatedUrl?: string,
+      cachedBlob?: Blob,
+      urlExpires?: Date
+    ): Promise<{ blob: Blob; source: string } | null> => {
+      // Check if URLs are expired
+      const isExpired = urlExpires ? new Date() >= urlExpires : true;
+      
+      // Try custom uploaded URL first (if not expired)
+      if (customUrl && !isExpired) {
+        try {
+          const blob = await downloadFile(customUrl);
+          return { blob, source: 'custom' };
+        } catch (error) {
+          console.warn(`Failed to download custom ${type} for scene ${i + 1}:`, error);
+        }
+      }
+      
+      // Try generated URL (if not expired)
+      if (generatedUrl && !isExpired) {
+        try {
+          const blob = await downloadFile(generatedUrl);
+          return { blob, source: 'generated' };
+        } catch (error) {
+          console.warn(`Failed to download generated ${type} for scene ${i + 1}:`, error);
+        }
+      }
+      
+      // Fallback to cached blob
+      if (cachedBlob) {
+        return { blob: cachedBlob, source: 'cached' };
+      }
+      
+      return null;
+    };
+    
     try {
       // Add image
-      if (scene.generated_image) {
-        const imageBlob = await downloadFile(scene.generated_image);
-        zip.file(`scene_${i + 1}_${sceneName}_image.png`, imageBlob);
+      const imageContent = await getContentBlob(
+        'image',
+        scene.custom_image_url,
+        scene.generated_image,
+        scene.cached_image_blob,
+        scene.image_url_expires
+      );
+      
+      if (imageContent) {
+        const suffix = imageContent.source === 'custom' ? '_uploaded' : '';
+        zip.file(`scene_${i + 1}_${sceneName}_image${suffix}.png`, imageContent.blob);
+      } else if (scene.generated_image || scene.custom_image_url) {
+        exportErrors.push(`Scene ${i + 1}: Image unavailable (expired or missing)`);
       }
       
       // Add video (no sound)
-      if (scene.generated_video) {
-        const videoBlob = await downloadFile(scene.generated_video);
-        zip.file(`scene_${i + 1}_${sceneName}_video.mp4`, videoBlob);
+      const videoContent = await getContentBlob(
+        'video',
+        scene.custom_video_url,
+        scene.generated_video,
+        scene.cached_video_blob,
+        scene.video_url_expires
+      );
+      
+      if (videoContent) {
+        const suffix = videoContent.source === 'custom' ? '_uploaded' : '';
+        zip.file(`scene_${i + 1}_${sceneName}_video${suffix}.mp4`, videoContent.blob);
+      } else if (scene.generated_video || scene.custom_video_url) {
+        exportErrors.push(`Scene ${i + 1}: Video unavailable (expired or missing)`);
       }
       
-      // Add final video with sound
-      if (scene.generated_sound) {
-        const finalBlob = await downloadFile(scene.generated_sound);
-        zip.file(`scene_${i + 1}_${sceneName}_final.mp4`, finalBlob);
+      // Add final video with sound (always generated, no custom uploads)
+      const soundContent = await getContentBlob(
+        'sound',
+        undefined, // No custom uploads for final audio
+        scene.generated_sound,
+        scene.cached_sound_blob,
+        scene.sound_url_expires
+      );
+      
+      if (soundContent) {
+        zip.file(`scene_${i + 1}_${sceneName}_final.mp4`, soundContent.blob);
+      } else if (scene.generated_sound) {
+        exportErrors.push(`Scene ${i + 1}: Final video with audio unavailable (expired or missing)`);
       }
+      
     } catch (error) {
-      console.error(`Error downloading files for scene ${i + 1}:`, error);
+      console.error(`Error processing files for scene ${i + 1}:`, error);
+      exportErrors.push(`Scene ${i + 1}: Unexpected error - ${error instanceof Error ? error.message : 'Unknown'}`);
     }
+  }
+  
+  // Add export report if there were issues
+  if (exportErrors.length > 0) {
+    const reportContent = `Export Report - ${new Date().toISOString()}\n\nThe following content could not be exported:\n\n${exportErrors.join('\n')}\n\nNote: Content expires after 1 hour (generated) or 24 hours (uploaded). Consider regenerating missing content.`;
+    zip.file('export_report.txt', reportContent);
+    
+    console.warn('Export completed with warnings. See export_report.txt in downloaded file.');
+    alert(`Export completed with ${exportErrors.length} warnings. Check export_report.txt for details.`);
   }
   
   // Generate zip file
